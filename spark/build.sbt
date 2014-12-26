@@ -17,7 +17,8 @@ libraryDependencies ++=Seq(
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.3.3",
   "com.fasterxml.jackson.module" % "jackson-module-scala_2.10" % "2.3.3",
   "junit" % "junit" % "4.7" % "test",
-  "org.scalatest" % "scalatest_2.10" % "2.0" % "test"
+  "org.scalatest" % "scalatest_2.10" % "2.0" % "test",
+  "mawazo" %% "hoidla" % "1.0"
 )
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings

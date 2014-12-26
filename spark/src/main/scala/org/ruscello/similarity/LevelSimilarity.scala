@@ -44,11 +44,17 @@ object LevelSimilarity {
 	    val path = config.getString("hdfs.path")
 	    val idOrdinal = config.getInt("id.ordinal")
 	    val lines = ssc.textFileStream(path)
+	    
+	    //map with id as the key
 	    val keyedLines = lines.map { line =>
 	      val items = line.split(",")
 	      val id = items(idOrdinal)
 	      (id, line)
 	    }
+	    
+	    //keyedLines.re
+	    
+	    
 	  }
 	  
 	  case "kafka" => {
