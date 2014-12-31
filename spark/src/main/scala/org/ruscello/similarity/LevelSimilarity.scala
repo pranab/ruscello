@@ -21,9 +21,15 @@ import org.apache.spark.SparkConf
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Seconds
 import com.typesafe.config.ConfigFactory
+import org.apache.spark.streaming.dstream.PairDStreamFunctions
+import org.hoidla.window.SizeBoundWindow
+
 
 object LevelSimilarity {
-  def main(args: Array[String]) {
+  /**
+ * @param args
+ */
+def main(args: Array[String]) {
 	val Array(master: String, configFile: String) = args.length match {
 		case x: Int if x == 2 => args.take(2)
 		case _ => throw new IllegalArgumentException("missing command line args")
@@ -37,8 +43,39 @@ object LevelSimilarity {
 	
 	val conf = new SparkConf().setMaster(master).setAppName("LevelSimilarity")
 	val ssc = new StreamingContext(conf, Seconds(batchDuration))
-
+	val brConf = ssc.sparkContext.broadcast(config)
+	
 	val source = config.getString("stream.source")
+	
+	val updateFunc = (values: Seq[String], state: Option[LevelCheckingWindow]) => {
+	  
+	  def getWindow() : LevelCheckingWindow = {
+	    val windowSize = brConf.value.getInt("window.size")
+	    val windowStep = brConf.value.getInt("window.step")
+	    val levelThrehold = brConf.value.getInt("level.threshold")
+	    val levelThresholdMargin = brConf.value.getInt("level.threshold.margin")
+	    val checkingStrategy = brConf.value.getString("checking.strategy")
+	      
+	      
+	    new LevelCheckingWindow(windowSize, windowStep, levelThrehold, 
+	    		levelThresholdMargin, checkingStrategy)
+	  }
+	  
+	  def extractReading(line : String) : Int = {
+	    val items = line.split(",")
+	    val readingOrdinal = brConf.value.getInt("reading.ordinal")
+	    Integer.parseInt(items(readingOrdinal))
+	  }
+	  
+	  val window= state.getOrElse(getWindow)
+	  values.foreach(l => {
+	    window.addAndCheck(extractReading(l))
+	  	}
+	  )
+	  
+			 
+	}
+	//ssc.sparkContext.
 	source match {
 	  case "hdfs" => {
 	    val path = config.getString("hdfs.path")
@@ -52,7 +89,7 @@ object LevelSimilarity {
 	      (id, line)
 	    }
 	    
-	    //keyedLines.re
+	    val pairStream = new PairDStreamFunctions(keyedLines)
 	    
 	    
 	  }
