@@ -23,13 +23,15 @@ import org.apache.spark.streaming.Seconds
 import com.typesafe.config.ConfigFactory
 import org.apache.spark.streaming.dstream.PairDStreamFunctions
 import org.hoidla.window.SizeBoundWindow
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.streaming.dstream.DStream
 
 
 object LevelSimilarity {
   /**
  * @param args
  */
-def main(args: Array[String]) {
+  def main(args: Array[String]) {
 	val Array(master: String, configFile: String) = args.length match {
 		case x: Int if x == 2 => args.take(2)
 		case _ => throw new IllegalArgumentException("missing command line args")
@@ -44,7 +46,6 @@ def main(args: Array[String]) {
 	val conf = new SparkConf().setMaster(master).setAppName("LevelSimilarity")
 	val ssc = new StreamingContext(conf, Seconds(batchDuration))
 	val brConf = ssc.sparkContext.broadcast(config)
-	
 	val source = config.getString("stream.source")
 	
 	val updateFunc = (values: Seq[String], state: Option[LevelCheckingWindow]) => {
@@ -83,14 +84,14 @@ def main(args: Array[String]) {
 	    val lines = ssc.textFileStream(path)
 	    
 	    //map with id as the key
-	    val keyedLines = lines.map { line =>
-	      val items = line.split(",")
-	      val id = items(idOrdinal)
-	      (id, line)
-	    }
-	    
+	    val keyedLines =  getKeyedLines(lines, idOrdinal)
 	    val pairStream = new PairDStreamFunctions(keyedLines)
-	    
+	  }
+	  
+	  case "socketText" => {
+	    val host = config.getString("socket.receiver.host")
+	    val port = config.getInt("socket.receiver.port")
+	    val lines = ssc.socketTextStream(host, port, StorageLevel.MEMORY_AND_DISK_SER_2)
 	    
 	  }
 	  
@@ -111,4 +112,13 @@ def main(args: Array[String]) {
 	ssc.awaitTermination(10000)
 	ssc.stop()	
   }
+
+  private def getKeyedLines(lines : DStream[String], idOrdinal : Int ) : DStream[(String, String)] = {
+    lines.map { line =>
+	      val items = line.split(",")
+	      val id = items(idOrdinal)
+	      (id, line)
+	}
+  }
+	
 }
