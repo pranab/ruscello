@@ -68,24 +68,25 @@ object LevelSimilarity {
 	    Integer.parseInt(items(readingOrdinal))
 	  }
 	  
-	  val window= state.getOrElse(getWindow)
+	  val window = state.getOrElse(getWindow)
 	  values.foreach(l => {
 	    window.addAndCheck(extractReading(l))
 	  	}
 	  )
-	  
-			 
+	  Some(window)		 
 	}
+	
 	//ssc.sparkContext.
+	val idOrdinal = config.getInt("id.ordinal")
 	source match {
 	  case "hdfs" => {
 	    val path = config.getString("hdfs.path")
-	    val idOrdinal = config.getInt("id.ordinal")
 	    val lines = ssc.textFileStream(path)
 	    
 	    //map with id as the key
 	    val keyedLines =  getKeyedLines(lines, idOrdinal)
 	    val pairStream = new PairDStreamFunctions(keyedLines)
+	    val stateStrem = pairStream.updateStateByKey(updateFunc)
 	  }
 	  
 	  case "socketText" => {
@@ -93,6 +94,10 @@ object LevelSimilarity {
 	    val port = config.getInt("socket.receiver.port")
 	    val lines = ssc.socketTextStream(host, port, StorageLevel.MEMORY_AND_DISK_SER_2)
 	    
+	    //map with id as the key
+	    val keyedLines =  getKeyedLines(lines, idOrdinal)
+	    val pairStream = new PairDStreamFunctions(keyedLines)
+	    val stateStrem = pairStream.updateStateByKey(updateFunc)
 	  }
 	  
 	  case "kafka" => {
@@ -115,9 +120,9 @@ object LevelSimilarity {
 
   private def getKeyedLines(lines : DStream[String], idOrdinal : Int ) : DStream[(String, String)] = {
     lines.map { line =>
-	      val items = line.split(",")
-	      val id = items(idOrdinal)
-	      (id, line)
+		val items = line.split(",")
+	    val id = items(idOrdinal)
+	    (id, line)
 	}
   }
 	
