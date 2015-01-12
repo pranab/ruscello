@@ -97,7 +97,9 @@ object LevelSimilarity {
 	    //map with id as the key
 	    val keyedLines =  getKeyedLines(lines, idOrdinal)
 	    val pairStream = new PairDStreamFunctions(keyedLines)
-	    val stateStrem = pairStream.updateStateByKey(updateFunc)
+	    val stateStream = pairStream.updateStateByKey(updateFunc)
+	    stateStream.count.print
+	
 	  }
 	  
 	  case "kafka" => {
@@ -114,7 +116,8 @@ object LevelSimilarity {
 	ssc.start()
 	
 	// Wait for 10 seconds then exit. To run forever call without a timeout
-	ssc.awaitTermination(10000)
+	val duration = brConf.value.getInt("run.duration")
+	ssc.awaitTermination(duration * 1000)
 	ssc.stop()	
   }
 

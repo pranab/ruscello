@@ -58,7 +58,8 @@ class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelT
 	        criteria.
 	        	withPredicate(new Predicate(Predicate.OPERAND_MEAN, Predicate.OPERATOR_GE, 
 	            levelThrehold + levelThresholdMargin)).
-	            withOr().withPredicate(new Predicate(Predicate.OPERAND_MEAN, Predicate.OPERATOR_LE, 
+	            withOr().
+	            withPredicate(new Predicate(Predicate.OPERAND_MEAN, Predicate.OPERATOR_LE, 
 	            levelThrehold - levelThresholdMargin))
 	      }
 	      
