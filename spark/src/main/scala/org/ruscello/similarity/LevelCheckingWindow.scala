@@ -67,4 +67,8 @@ class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelT
 	    }
 	}
 	
+	def numViolations() : Int = {
+	  violations.size
+	}
+	
 }

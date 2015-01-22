@@ -25,7 +25,10 @@ import org.apache.spark.streaming.dstream.PairDStreamFunctions
 import org.hoidla.window.SizeBoundWindow
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.SparkContext
 
+case class WindowConfig(windowSize : Int, windowStep : Int, levelThrehold : Int, 
+    levelThresholdMargin : Int, checkingStrategy : String, readingOrdinal : Int)
 
 object LevelSimilarity {
   /**
@@ -42,21 +45,42 @@ object LevelSimilarity {
 	val config = ConfigFactory.load()
 	val batchDuration = config.getInt("batch.duration")
 	
-	
-	val conf = new SparkConf().setMaster(master).setAppName("LevelSimilarity")
+	val conf = new SparkConf()
+		.setMaster(master)
+		.setAppName("LevelSimilarity")
+		.set("spark.executor.memory", "1g")
+		
+
 	val ssc = new StreamingContext(conf, Seconds(batchDuration))
-	val brConf = ssc.sparkContext.broadcast(config)
+	//val brConf = ssc.sparkContext.broadcast(config)
 	val source = config.getString("stream.source")
+	ssc.checkpoint(config.getString("checkpoint.dir"))
+	
+	//ssc.
+	val windowSize = config.getInt("window.size")
+	val windowStep = config.getInt("window.step")
+	val levelThrehold = config.getInt("level.threshold.value")
+	val levelThresholdMargin = config.getInt("level.threshold.margin")
+	val checkingStrategy = config.getString("checking.strategy")
+	val readingOrdinal = config.getInt("reading.ordinal")
+	val winConfig = WindowConfig(windowSize, windowStep, levelThrehold, 
+			levelThresholdMargin, checkingStrategy, readingOrdinal)
+	val brConf = ssc.sparkContext.broadcast(winConfig)
+	
+	val sc = ssc.sparkContext
+	sc.addJar(config.getString("hoidla.jar"))
+	sc.addJar(config.getString("commons.lang.jar"))
+	sc.addJar(config.getString("commons.math.jar"))
 	
 	val updateFunc = (values: Seq[String], state: Option[LevelCheckingWindow]) => {
 	  
 	  def getWindow() : LevelCheckingWindow = {
-	    val windowSize = brConf.value.getInt("window.size")
-	    val windowStep = brConf.value.getInt("window.step")
-	    val levelThrehold = brConf.value.getInt("level.threshold")
-	    val levelThresholdMargin = brConf.value.getInt("level.threshold.margin")
-	    val checkingStrategy = brConf.value.getString("checking.strategy")
-	      
+	    val conf = brConf.value
+	    val windowSize = conf.windowSize
+	    val windowStep = conf.windowStep
+	    val levelThrehold = conf.levelThrehold
+	    val levelThresholdMargin = conf.levelThresholdMargin
+	    val checkingStrategy = conf.checkingStrategy
 	      
 	    new LevelCheckingWindow(windowSize, windowStep, levelThrehold, 
 	    		levelThresholdMargin, checkingStrategy)
@@ -64,7 +88,7 @@ object LevelSimilarity {
 	  
 	  def extractReading(line : String) : Int = {
 	    val items = line.split(",")
-	    val readingOrdinal = brConf.value.getInt("reading.ordinal")
+	    val readingOrdinal = brConf.value.readingOrdinal
 	    Integer.parseInt(items(readingOrdinal))
 	  }
 	  
@@ -94,14 +118,45 @@ object LevelSimilarity {
 	    val port = config.getInt("socket.receiver.port")
 	    val lines = ssc.socketTextStream(host, port, StorageLevel.MEMORY_AND_DISK_SER_2)
 	    
+	    /*
+	    lines.foreach(lr => {
+	      lr.foreach(l => {
+	        println(l)
+	      }
+	      )
+	    }
+	    )
+	    */
+	    
 	    //map with id as the key
+	    /*
 	    val keyedLines =  getKeyedLines(lines, idOrdinal)
 	    val pairStream = new PairDStreamFunctions(keyedLines)
 	    val stateStream = pairStream.updateStateByKey(updateFunc)
 	    stateStream.count.print
-	
+	    */
+	    
+	    
+	    val keyedLines =  getKeyedLines(lines, idOrdinal)
+	    /*
+	    keyedLines.foreach(kls => {
+	      kls.foreach(kl => {
+	        println(kl._1)
+	      })
+	      
+	    })
+	    */
+	    
+	    val pairStream = new PairDStreamFunctions(keyedLines)
+	    val stateStream = pairStream.updateStateByKey(updateFunc)
+	    stateStream.foreach(ssrdd => {
+	      ssrdd.foreach(ss => {
+	        val res = ss._2
+	        print("device:" + ss._1 + " num violations:" + res.numViolations)
+	      })
+	    })
+	    
 	  }
-	  
 	  case "kafka" => {
 	    
 	  }
@@ -116,17 +171,20 @@ object LevelSimilarity {
 	ssc.start()
 	
 	// Wait for 10 seconds then exit. To run forever call without a timeout
-	val duration = brConf.value.getInt("run.duration")
-	ssc.awaitTermination(duration * 1000)
-	ssc.stop()	
+	val duration = config.getInt("run.duration")
+	println("duration: "+ duration)
+	//ssc.awaitTermination(duration * 1000)
+	ssc.awaitTermination()
+	//ssc.stop()	
   }
 
   private def getKeyedLines(lines : DStream[String], idOrdinal : Int ) : DStream[(String, String)] = {
-    lines.map { line =>
+    val keyed = lines.map { line =>
 		val items = line.split(",")
 	    val id = items(idOrdinal)
 	    (id, line)
 	}
+    keyed
   }
 	
 }
