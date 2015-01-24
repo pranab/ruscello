@@ -23,7 +23,7 @@ import org.hoidla.query.Predicate
 import org.hoidla.query.Criteria
 
 class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelThrehold : Int, 
-    val levelThresholdMargin : Int, val checkingStrategy : String) {
+    val levelThresholdMargin : Int, val checkingStrategy : String) extends Serializable {
 	val window = new SizeBoundWindow[Int](windowSize, windowStep)
 	var violations = List[(Long, Double)]()
 	val criteria = new Criteria();
