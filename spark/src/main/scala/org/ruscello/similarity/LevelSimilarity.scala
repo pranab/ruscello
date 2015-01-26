@@ -153,7 +153,7 @@ object LevelSimilarity {
 	    stateStream.foreach(ssrdd => {
 	      ssrdd.foreach(ss => {
 	        val res = ss._2
-	        print("device:" + ss._1 + " num violations:" + res.numViolations)
+	        println("device:" + ss._1 + " num violations:" + res.numViolations)
 	      })
 	    })
 	    

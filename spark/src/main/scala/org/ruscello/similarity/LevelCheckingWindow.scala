@@ -61,6 +61,22 @@ class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelT
 	            withOr().
 	            withPredicate(new Predicate(Predicate.OPERAND_MEAN, Predicate.OPERATOR_LE, 
 	            levelThrehold - levelThresholdMargin))
+	      } 
+	      
+	      case "levelThresholdCount" => {
+	        val upper : java.lang.Double = (levelThrehold + levelThresholdMargin)
+	        val prAbove = new Predicate().
+	        		withOperand(Predicate.OPERAND_ABOVE_THRESHOLD).
+	        		withParameters(upper)
+	        val lower : java.lang.Double = (levelThrehold - levelThresholdMargin)
+	        val prBelow = new Predicate().
+	        		withOperand(Predicate.OPERAND_BELOW_THRESHOLD).
+	        		withParameters(lower)
+	        		
+	        criteria.
+	        	withPredicate(prAbove).
+	            withOr().	        	
+	        	withPredicate(prBelow)
 	      }
 	      
 	      case _ => throw new IllegalArgumentException("invalid checking strategy")
