@@ -23,7 +23,7 @@ import org.hoidla.query.Predicate
 import org.hoidla.query.Criteria
 
 class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelThrehold : Int, 
-    val levelThresholdMargin : Int, val checkingStrategy : String) extends Serializable {
+    val levelThresholdMargin : Int, val levelCrossingCountThreshold : Double, val checkingStrategy : String) extends Serializable {
 	val window = new SizeBoundWindow[Int](windowSize, windowStep)
 	var violations = List[(Long, Double)]()
 	val criteria = new Criteria();
@@ -55,6 +55,7 @@ class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelT
 	private def buildCriteria() {
 	    checkingStrategy match {
 	      case "simpleMean" => {
+	        //window wide mean
 	        criteria.
 	        	withPredicate(new Predicate(Predicate.OPERAND_MEAN, Predicate.OPERATOR_GE, 
 	            levelThrehold + levelThresholdMargin)).
@@ -63,7 +64,8 @@ class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelT
 	            levelThrehold - levelThresholdMargin))
 	      } 
 	      
-	      case "levelThresholdCount" => {
+	      case "levelThresholdAllCount" => {
+	        //sample count across window crossing threshold
 	        val upper : java.lang.Double = (levelThrehold + levelThresholdMargin)
 	        val prAbove = new Predicate().
 	        		withOperand(Predicate.OPERAND_ABOVE_THRESHOLD).
@@ -77,6 +79,25 @@ class LevelCheckingWindow(val windowSize : Int, val windowStep : Int, val levelT
 	        	withPredicate(prAbove).
 	            withOr().	        	
 	        	withPredicate(prBelow)
+	      }
+	      
+	      case "levelThresholdMinCount" => {
+	        //sample count across window crossing threshold being above some count threshold
+	        val upper : java.lang.Double = (levelThrehold + levelThresholdMargin)
+	        val countThreshold : java.lang.Double = levelCrossingCountThreshold
+	        val prAbove = new Predicate().
+	        		withOperand(Predicate.OPERAND_ABOVE_THRESHOLD_WITH_MIN_COUNT).
+	        		withParameters(upper, countThreshold)
+	        val lower : java.lang.Double = (levelThrehold - levelThresholdMargin)
+	        val prBelow = new Predicate().
+	        		withOperand(Predicate.OPERAND_BELOW_THRESHOLD_WITH_MIN_COUNT).
+	        		withParameters(lower, countThreshold)
+	        		
+	        criteria.
+	        	withPredicate(prAbove).
+	            withOr().	        	
+	        	withPredicate(prBelow)
+	        
 	      }
 	      
 	      case _ => throw new IllegalArgumentException("invalid checking strategy")

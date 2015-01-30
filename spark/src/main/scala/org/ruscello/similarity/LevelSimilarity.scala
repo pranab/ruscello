@@ -29,7 +29,8 @@ import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.SparkContext
 
 case class WindowConfig(windowSize : Int, windowStep : Int, levelThrehold : Int, 
-    levelThresholdMargin : Int, checkingStrategy : String, readingOrdinal : Int)
+    levelThresholdMargin : Int, levelCrossingCountThreshold : Double, checkingStrategy : String, 
+    readingOrdinal : Int)
 
 object LevelSimilarity {
   /**
@@ -61,11 +62,12 @@ object LevelSimilarity {
 	val windowSize = config.getInt("window.size")
 	val windowStep = config.getInt("window.step")
 	val levelThrehold = config.getInt("level.threshold.value")
+	val levelCrossingCountThreshold = config.getDouble("level.crossing.count.threshold")
 	val levelThresholdMargin = config.getInt("level.threshold.margin")
 	val checkingStrategy = config.getString("checking.strategy")
 	val readingOrdinal = config.getInt("reading.ordinal")
 	val winConfig = WindowConfig(windowSize, windowStep, levelThrehold, 
-			levelThresholdMargin, checkingStrategy, readingOrdinal)
+			levelThresholdMargin, levelCrossingCountThreshold, checkingStrategy, readingOrdinal)
 	val brConf = ssc.sparkContext.broadcast(winConfig)
 	
 	val sc = ssc.sparkContext
@@ -81,10 +83,11 @@ object LevelSimilarity {
 	    val windowStep = conf.windowStep
 	    val levelThrehold = conf.levelThrehold
 	    val levelThresholdMargin = conf.levelThresholdMargin
+	    val levelCrossingCountThreshold = conf.levelCrossingCountThreshold
 	    val checkingStrategy = conf.checkingStrategy
 	      
 	    new LevelCheckingWindow(windowSize, windowStep, levelThrehold, 
-	    		levelThresholdMargin, checkingStrategy)
+	    		levelThresholdMargin, levelCrossingCountThreshold, checkingStrategy)
 	  }
 	  
 	  def extractReading(line : String) : Int = {
