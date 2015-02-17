@@ -122,34 +122,12 @@ object LevelSimilarity {
 	    val port = config.getInt("socket.receiver.port")
 	    val lines = ssc.socketTextStream(host, port, StorageLevel.MEMORY_AND_DISK_SER_2)
 	    
-	    /*
-	    lines.foreach(lr => {
-	      lr.foreach(l => {
-	        println(l)
-	      }
-	      )
-	    }
-	    )
-	    */
+	    //printInput(lines)
 	    
 	    //map with id as the key
-	    /*
 	    val keyedLines =  getKeyedLines(lines, idOrdinal)
-	    val pairStream = new PairDStreamFunctions(keyedLines)
-	    val stateStream = pairStream.updateStateByKey(updateFunc)
-	    stateStream.count.print
-	    */
 	    
-	    
-	    val keyedLines =  getKeyedLines(lines, idOrdinal)
-	    /*
-	    keyedLines.foreach(kls => {
-	      kls.foreach(kl => {
-	        println(kl._1)
-	      })
-	      
-	    })
-	    */
+	    //printKeyedInput(keyedLines)
 	    
 	    val pairStream = new PairDStreamFunctions(keyedLines)
 	    val stateStream = pairStream.updateStateByKey(updateFunc)
@@ -191,4 +169,22 @@ object LevelSimilarity {
     keyed
   }
 	
+  private def printInput(lines : DStream[String]) {
+    lines.foreach(lr => {
+	      lr.foreach(l => {
+	        println(l)
+	      }
+	      )
+	})    
+  }
+  
+  private def printKeyedInput(keyedLines : DStream[(String, String)]) {
+    keyedLines.foreach(kls => {
+	      kls.foreach(kl => {
+	        println(kl._1)
+	      })
+	      
+	})
+  }
+  
 }
