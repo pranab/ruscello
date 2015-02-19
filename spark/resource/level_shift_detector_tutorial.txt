@@ -1,0 +1,58 @@
+This tutorial is about about detecting outliers in time series data. More specifically it detects
+significant shift in level of time series data. 
+
+1. Requirement
+==============
+Following are the requirements
+- java
+- scala
+- spark
+- Hadoop HDFS
+- python
+- maven
+- sbt
+
+2. Build
+=========
+
+2.1 Build hoidla
+mvn clean install
+
+2.2 Publish hoidla to local ivy repository
+sbt publishLocal
+
+2.3 Build ruscello
+sbt clean compile package
+
+3. Runtime
+==========
+
+Start Hdoop HDFS and spark
+
+4. Configuration
+=================
+Make changes in level_shift.properties according to your needs and and your environment
+
+5. Ruscello
+===========
+Run as below
+./level_shift.sh
+
+6. Sensor data
+==============
+In another terminal generate sensor data as below
+./sensor_data_gen.py  <num_sensor> <duration> <sampling_interval> <desired_level> <normal_av_duration> <shifted_av_duration> | nc -lk <port>
+
+where 
+num_sensor = number of sensors e.g. 2
+duration = duration of test in sec e.g. 200
+sampling_interval = sampling interval in sec e.g. 0.01
+desired_level = desired sensor reading level e.g. 68
+normal_av_duration = average duration with reading at normal level e.g. 30
+shifted_av_duration = average duration with reading at shifted level e.g. 4
+port = socket port for sensor data (same as in properties config file) e.g., 9147
+
+7. Output
+=========
+In Spark web console, select the job and browse the stdout output
+

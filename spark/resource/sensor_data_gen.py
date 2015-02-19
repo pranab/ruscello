@@ -16,6 +16,10 @@ numSensors = int(sys.argv[1])
 duration = int(sys.argv[2])	
 samplingInterval = float(sys.argv[3])
 meanReading = int(sys.argv[4])	
+normModeDuration = int(sys.argv[5])
+devModeDuration = int(sys.argv[6])
+
+
 numReading = int(duration / samplingInterval)
 
 #print "numSensors=%d duration=%d samplingInterval=%f meanReading=%d numReading=%d" %(numSensors, duration, samplingInterval, meanReading, numReading)
@@ -27,9 +31,9 @@ for i in range(numSensors):
 	sensorIds.append(genID(8))
 
 # generate sensor reading and write to queue   		               
-def sensorReader(id, sensorID, numReading, meanReading, samplingInterval, threadLock):
+def sensorReader(id, sensorID, numReading, meanReading, samplingInterval, normModeDuration, devModeDuration, threadLock):
 	mode = 0
-	modeNumReading = getModeNumSamples(mode, samplingInterval)
+	modeNumReading = getModeNumSamples(mode, samplingInterval, normModeDuration, devModeDuration)
 	modeReadingCnt = 0
 	#print "sensor %s mode %d numReading %d" %(sensorID,mode,modeNumReading)
 		
@@ -39,7 +43,7 @@ def sensorReader(id, sensorID, numReading, meanReading, samplingInterval, thread
 			modeReadingCnt += 1
 		else:
 			mode = switchMode(mode)
-			modeNumReading = getModeNumSamples(mode, samplingInterval)
+			modeNumReading = getModeNumSamples(mode, samplingInterval, normModeDuration, devModeDuration)
 			#print "sensor %s mode %d numReading %d" %(sensorID,mode,modeNumReading)
 			modeReadingCnt = 0
 			reading = getReading(meanReading, mode)
@@ -83,11 +87,11 @@ def switchMode(mode):
 			newMode = 1
 	return newMode			
 
-def getModeNumSamples(mode, samplingInterval):
+def getModeNumSamples(mode, samplingInterval, normModeDuration, devModeDuration):
 	if (mode == 0):
-		modeNumReading = int((20 + randint(0,20)) / samplingInterval)
+		modeNumReading = int((normModeDuration + randint(-normModeDuration/2,normModeDuration/2)) / samplingInterval)
 	else:
-		modeNumReading = int((10 + randint(0,10)) / samplingInterval)
+		modeNumReading = int((devModeDuration + randint(-devModeDuration/2, devModeDuration/2)) / samplingInterval)
 	return 	modeNumReading
 		
 
@@ -111,7 +115,8 @@ def randomNoise():
 #sensor threads
 threadLock = threading.Lock()
 for i in range(numSensors):
-	t = threading.Thread(target=sensorReader, args=(i, sensorIds[i], numReading, meanReading, samplingInterval, threadLock))
+	t = threading.Thread(target=sensorReader, args=(i, sensorIds[i], numReading, meanReading, 
+		samplingInterval, normModeDuration, devModeDuration, threadLock))
 	t.start()
 
 
