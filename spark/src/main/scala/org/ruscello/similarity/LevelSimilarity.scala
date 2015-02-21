@@ -133,8 +133,7 @@ object LevelSimilarity {
 	  }
 	  
 	  case "kafka" => {
-	    //kafka as tream source 
-	    //there should be only one partition because messages need to be processed in order
+	    //kafka as stream source 
 	    val zooKeeperServerLList = config.getString("zookeeper.connect")
 	    val zooKeeperSessTmOut = config.getString("zookeeper.session.timeout.ms")
 	    val zooKeeperSyncTime = config.getString("zookeeper.sync.time.ms")
@@ -158,9 +157,28 @@ object LevelSimilarity {
 	    	KafkaUtils.createStream[String, String, StringDecoder, StringDecoder](
 	    	    ssc, kafkaParams, topics, StorageLevel.MEMORY_AND_DISK)
 	    }
-	    val unifiedStream = ssc.union(kafkaDStreams)
-	    val lines = unifiedStream.map { v => v._2 }
-	    val stateStrem = getStateStream(lines, idOrdinal, updateFunc)
+	    
+	    val partitonedBySensor = config.getBoolean("partitoned.by.sensor")
+	    partitonedBySensor match {
+	      case true => {
+	        //partitioned by sensor
+	        kafkaDStreams.foreach(str => {
+	    	  val lines = str.map { v => v._2 }
+	          val stateStrem = getStateStream(lines, idOrdinal, updateFunc)
+	          
+	        })
+	      }
+	      case false => {
+	    	  //not partitioned by sensor
+	    	  if (numParitions != 1) {
+	    	    throw new IllegalArgumentException(
+	    	        "when not partitoned by sensor, there should be only 1 partition");
+	    	  }
+	    	  val unifiedStream = ssc.union(kafkaDStreams)
+	    	  val lines = unifiedStream.map { v => v._2 }
+	          val stateStrem = getStateStream(lines, idOrdinal, updateFunc)
+	      }
+	    }
 	  }
 	  
 	  case _ => {
