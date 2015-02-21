@@ -27,6 +27,8 @@ import org.hoidla.window.SizeBoundWindow
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.SparkContext
+import org.apache.spark.streaming.kafka.KafkaUtils
+import kafka.serializer.StringDecoder
 
 case class WindowConfig(windowSize : Int, windowStep : Int, levelThrehold : Int, 
     levelThresholdMargin : Int, levelCrossingCountThreshold : Double, checkingStrategy : String, 
@@ -107,30 +109,20 @@ object LevelSimilarity {
 	//ssc.sparkContext.
 	val idOrdinal = config.getInt("id.ordinal")
 	source match {
+	  //HDFS files as stream source
 	  case "hdfs" => {
 	    val path = config.getString("hdfs.path")
 	    val lines = ssc.textFileStream(path)
-	    
-	    //map with id as the key
-	    val keyedLines =  getKeyedLines(lines, idOrdinal)
-	    val pairStream = new PairDStreamFunctions(keyedLines)
-	    val stateStrem = pairStream.updateStateByKey(updateFunc)
+	    val stateStrem = getStateStream(lines, idOrdinal, updateFunc)
 	  }
 	  
 	  case "socketText" => {
+	    //socket server as stream source
 	    val host = config.getString("socket.receiver.host")
 	    val port = config.getInt("socket.receiver.port")
 	    val lines = ssc.socketTextStream(host, port, StorageLevel.MEMORY_AND_DISK_SER_2)
+	    val stateStream = getStateStream(lines, idOrdinal, updateFunc)
 	    
-	    //printInput(lines)
-	    
-	    //map with id as the key
-	    val keyedLines =  getKeyedLines(lines, idOrdinal)
-	    
-	    //printKeyedInput(keyedLines)
-	    
-	    val pairStream = new PairDStreamFunctions(keyedLines)
-	    val stateStream = pairStream.updateStateByKey(updateFunc)
 	    stateStream.foreach(ssrdd => {
 	      ssrdd.foreach(ss => {
 	        val res = ss._2
@@ -139,8 +131,36 @@ object LevelSimilarity {
 	    })
 	    
 	  }
+	  
 	  case "kafka" => {
+	    //kafka as tream source 
+	    //there should be only one partition because messages need to be processed in order
+	    val zooKeeperServerLList = config.getString("zookeeper.connect")
+	    val zooKeeperSessTmOut = config.getString("zookeeper.session.timeout.ms")
+	    val zooKeeperSyncTime = config.getString("zookeeper.sync.time.ms")
 	    
+	    
+	    val consumerGroupId = config.getString("kafka.consumer.group.id")
+	    val topic = config.getString("kafka.topic")
+	    val numParitions = config.getInt("kafka.num.partitions")
+	    val autoCommitInterval = config.getString("auto.commit.interval.ms")
+	    
+	    val kafkaParams: Map[String, String] = Map(
+	        "zookeeper.connect" -> zooKeeperServerLList,
+	        "zookeeper.session.timeout.ms" -> zooKeeperSessTmOut,
+	        "zookeeper.sync.time.ms" -> zooKeeperSyncTime,
+	        "auto.commit.interval.ms" -> autoCommitInterval,
+	        "group.id" -> "consumerGroupId"
+	    )
+	    val topics = Map(topic -> 1)
+	    val numDStreams = numParitions
+	    val kafkaDStreams = (1 to numDStreams).map { _ =>
+	    	KafkaUtils.createStream[String, String, StringDecoder, StringDecoder](
+	    	    ssc, kafkaParams, topics, StorageLevel.MEMORY_AND_DISK)
+	    }
+	    val unifiedStream = ssc.union(kafkaDStreams)
+	    val lines = unifiedStream.map { v => v._2 }
+	    val stateStrem = getStateStream(lines, idOrdinal, updateFunc)
 	  }
 	  
 	  case _ => {
@@ -160,6 +180,16 @@ object LevelSimilarity {
 	//ssc.stop()	
   }
 
+  private def getStateStream(lines : DStream[String], idOrdinal : Int, 
+      updateFunc: (Seq[String], Option[LevelCheckingWindow]) => Some[LevelCheckingWindow]) : DStream[(String, LevelCheckingWindow)] = {
+	  //map with id as the key
+	  val keyedLines =  getKeyedLines(lines, idOrdinal)
+	  //printKeyedInput(keyedLines)
+	  val pairStream = new PairDStreamFunctions(keyedLines)
+	  val stateStream = pairStream.updateStateByKey(updateFunc)
+      stateStream
+  }
+  
   private def getKeyedLines(lines : DStream[String], idOrdinal : Int ) : DStream[(String, String)] = {
     val keyed = lines.map { line =>
 		val items = line.split(",")
@@ -186,5 +216,4 @@ object LevelSimilarity {
 	      
 	})
   }
-  
 }
