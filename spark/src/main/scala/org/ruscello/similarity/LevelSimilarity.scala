@@ -141,7 +141,7 @@ object LevelSimilarity {
 	    
 	    val consumerGroupId = config.getString("kafka.consumer.group.id")
 	    val topic = config.getString("kafka.topic")
-	    val numParitions = config.getInt("kafka.num.partitions")
+	    val numDStreams = config.getInt("kafka.num.input.stream")
 	    val autoCommitInterval = config.getString("auto.commit.interval.ms")
 	    
 	    val kafkaParams: Map[String, String] = Map(
@@ -152,7 +152,6 @@ object LevelSimilarity {
 	        "group.id" -> "consumerGroupId"
 	    )
 	    val topics = Map(topic -> 1)
-	    val numDStreams = numParitions
 	    val kafkaDStreams = (1 to numDStreams).map { _ =>
 	    	KafkaUtils.createStream[String, String, StringDecoder, StringDecoder](
 	    	    ssc, kafkaParams, topics, StorageLevel.MEMORY_AND_DISK)
@@ -161,7 +160,7 @@ object LevelSimilarity {
 	    val partitonedBySensor = config.getBoolean("partitoned.by.sensor")
 	    partitonedBySensor match {
 	      case true => {
-	        //partitioned by sensor
+	        //partitioned by sensor, each stream may handle one or partitions
 	        kafkaDStreams.foreach(str => {
 	    	  val lines = str.map { v => v._2 }
 	          val stateStrem = getStateStream(lines, idOrdinal, updateFunc)
@@ -170,7 +169,7 @@ object LevelSimilarity {
 	      }
 	      case false => {
 	    	  //not partitioned by sensor
-	    	  if (numParitions != 1) {
+	    	  if (numDStreams != 1) {
 	    	    throw new IllegalArgumentException(
 	    	        "when not partitoned by sensor, there should be only 1 partition");
 	    	  }

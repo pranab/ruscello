@@ -1,9 +1,9 @@
 This tutorial is about about detecting outliers in time series data. More specifically it detects
 significant shift in level of time series data. 
 
-1. Requirement
+1. Environment
 ==============
-Following are the requirements
+Following are the environment requirements
 - java
 - scala
 - spark
@@ -14,7 +14,6 @@ Following are the requirements
 
 2. Build
 =========
-
 2.1 Build hoidla
 mvn clean install
 
@@ -26,8 +25,7 @@ sbt clean compile package
 
 3. Runtime
 ==========
-
-Start Hdoop HDFS and spark
+Start Hdoop HDFS and Spark
 
 4. Configuration
 =================
