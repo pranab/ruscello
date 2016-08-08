@@ -18,11 +18,16 @@
 package org.ruscello.event
 
 import org.chombo.spark.common.JobConfiguration
+import  org.chombo.spark.common.StreamUtil
+import org.hoidla.window.TimeBoundEventLocalityAnalyzer
+import org.hoidla.window.EventLocality
 import org.chombo.spark.common.Record
 import scala.collection.JavaConverters._
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Seconds
+import org.apache.spark.streaming.{State, StateSpec, Time}
+import org.hoidla.util.ExplicitlyTimeStampedFlag
 
 /**
 * Converts event cluster or burst of events  in a short time to one events, to
@@ -39,13 +44,44 @@ object EventCluster extends JobConfiguration {
 	   val sparkCntxt = new SparkContext(sparkConf)
 	   val appConfig = config.getConfig(appName)
 	   
+	   //config params
 	   val batchDuration = appConfig.getInt("batch.duration")
-	   val ssc = new StreamingContext(sparkConf, Seconds(batchDuration))
+	   val strContxt = new StreamingContext(sparkConf, Seconds(batchDuration))
 	   val source = config.getString("stream.source")
-	   ssc.checkpoint(appConfig.getString("checkpoint.dir"))
+	   strContxt.checkpoint(appConfig.getString("checkpoint.dir"))
 	   val keyFieldOrdinals = appConfig.getIntList("key.field.ordinals").asScala
 	   val timeStampFieldOrdinal = appConfig.getInt("timeStamp.field.ordinal")
+	   val windowTimeSpan = appConfig.getLong("window.timeSpan")
+	   val windowTimeStep = appConfig.getLong("window.timeStep")
+	   val minOccurence = appConfig.getInt("window.minOccurence")
+	   val maxIntervalAverage: Long = appConfig.getLong("window.maxIntervalAverage")
+	   val maxIntervalMax: Long = appConfig.getLong("window.maxIntervalMax")
+	   val minRangeLength: Long = appConfig.getLong("window.minRangeLength")
+	   val strategies = appConfig.getStringList("clustering.strategies")
 
+	   //state update function
+	   val  stateUpdateFunction = (entityID: Record, timeStamp: Option[Long], 
+	       state: State[TimeBoundEventLocalityAnalyzer]) => {
+	         
+	     def getWindow() : TimeBoundEventLocalityAnalyzer = {
+	       val context = new EventLocality.Context(minOccurence, maxIntervalAverage, maxIntervalMax, 
+	           minRangeLength, strategies)
+	       new TimeBoundEventLocalityAnalyzer(windowTimeSpan, windowTimeStep,  context)
+	     }
+	     
+	     //get window and add new event
+	     val window = state.getOption.getOrElse(getWindow)
+	     val event = new ExplicitlyTimeStampedFlag(timeStamp.get)
+	     window.add(event)
+	     state.update(window)
+	     
+	     val score = window.getScore()
+	     val alarm = new Record(2)
+	     alarm.addLong(timeStamp.get).addDouble(score)
+	     (entityID, alarm)
+	   }
+	   
+	   val strm = StreamUtil.getStreamSource(appConfig, strContxt)   
 	   
    }  
 }
