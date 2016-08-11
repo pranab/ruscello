@@ -58,14 +58,16 @@ object EventCluster extends JobConfiguration {
 	   val maxIntervalMax: Long = appConfig.getLong("window.maxIntervalMax")
 	   val minRangeLength: Long = appConfig.getLong("window.minRangeLength")
 	   val strategies = appConfig.getStringList("clustering.strategies")
-
+	   val anyCond = appConfig.getBoolean("any.cond")
+	   val fieldDelimIn = appConfig.getString("field.delim.in")
+	     
 	   //state update function
 	   val  stateUpdateFunction = (entityID: Record, timeStamp: Option[Long], 
 	       state: State[TimeBoundEventLocalityAnalyzer]) => {
 	         
 	     def getWindow() : TimeBoundEventLocalityAnalyzer = {
 	       val context = new EventLocality.Context(minOccurence, maxIntervalAverage, maxIntervalMax, 
-	           minRangeLength, strategies)
+	           minRangeLength, strategies, anyCond)
 	       new TimeBoundEventLocalityAnalyzer(windowTimeSpan, windowTimeStep,  context)
 	     }
 	     
@@ -77,11 +79,20 @@ object EventCluster extends JobConfiguration {
 	     
 	     val score = window.getScore()
 	     val alarm = new Record(2)
-	     alarm.addLong(timeStamp.get).addDouble(score)
+	     val alarmOn = score > 0.99
+	     alarm.addLong(timeStamp.get).addBoolean(alarmOn)
 	     (entityID, alarm)
 	   }
 	   
-	   val strm = StreamUtil.getStreamSource(appConfig, strContxt)   
+	   //extract time stamp
+	   val strm = StreamUtil.getKeyedStreamSource(appConfig, strContxt)   
+	   val tsStrm = strm.mapValues(v => {
+	     val fields = v.split(fieldDelimIn)
+	     fields(timeStampFieldOrdinal).toLong
+	   })
 	   
+	   val spec = StateSpec.function(stateUpdateFunction)
+	   val mappedStatefulStream = tsStrm.mapWithState(spec)
+
    }  
 }
