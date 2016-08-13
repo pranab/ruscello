@@ -60,6 +60,10 @@ object EventCluster extends JobConfiguration {
 	   val strategies = appConfig.getStringList("clustering.strategies")
 	   val anyCond = appConfig.getBoolean("any.cond")
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
+	   val scoreMinThreshold = appConfig.getDouble("score.min.threshold")
+	   val duration = appConfig.getInt("run.duration")
+	   val debugOn = appConfig.getBoolean("debug.on")
+	   val outputFilePrefix = appConfig.getString("output.file.prefix")
 	     
 	   //state update function
 	   val  stateUpdateFunction = (entityID: Record, timeStamp: Option[Long], 
@@ -78,10 +82,8 @@ object EventCluster extends JobConfiguration {
 	     state.update(window)
 	     
 	     val score = window.getScore()
-	     val alarm = new Record(2)
-	     val alarmOn = score > 0.99
-	     alarm.addLong(timeStamp.get).addBoolean(alarmOn)
-	     (entityID, alarm)
+	     val alarmOn = score > scoreMinThreshold
+	     (entityID,timeStamp.get , alarmOn)
 	   }
 	   
 	   //extract time stamp
@@ -93,6 +95,22 @@ object EventCluster extends JobConfiguration {
 	   
 	   val spec = StateSpec.function(stateUpdateFunction)
 	   val mappedStatefulStream = tsStrm.mapWithState(spec)
-
+	   
+	   if (debugOn) {
+	     mappedStatefulStream.print
+	   }
+	 
+	   //output
+	   mappedStatefulStream.saveAsTextFiles(outputFilePrefix)
+	   
+	   // start our streaming context and wait for it to "finish"
+	   strContxt.start()
+	   
+	   // Wait and then exit. To run forever call without a timeout
+	   if (duration > 0) {
+		   strContxt.awaitTermination(duration * 1000)
+	   } else  {
+		   strContxt.awaitTermination()
+	   }
    }  
 }
