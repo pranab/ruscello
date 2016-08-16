@@ -60,10 +60,11 @@ object EventCluster extends JobConfiguration {
 	   val strategies = appConfig.getStringList("clustering.strategies")
 	   val anyCond = appConfig.getBoolean("any.cond")
 	   val fieldDelimIn = appConfig.getString("field.delim.in")
-	   val scoreMinThreshold = appConfig.getDouble("score.min.threshold")
+	   val scoreMinThreshold = appConfig.getDouble("window.scoreMinThreshold")
 	   val duration = appConfig.getInt("run.duration")
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val outputFilePrefix = appConfig.getString("output.file.prefix")
+	   val minEventTimeInterval = appConfig.getLong("window.minEventTimeInterval")
 	     
 	   //state update function
 	   val  stateUpdateFunction = (entityID: Record, timeStamp: Option[Long], 
@@ -72,7 +73,8 @@ object EventCluster extends JobConfiguration {
 	     def getWindow() : TimeBoundEventLocalityAnalyzer = {
 	       val context = new EventLocality.Context(minOccurence, maxIntervalAverage, maxIntervalMax, 
 	           minRangeLength, strategies, anyCond)
-	       new TimeBoundEventLocalityAnalyzer(windowTimeSpan, windowTimeStep,  context)
+	       new TimeBoundEventLocalityAnalyzer(windowTimeSpan, windowTimeStep,  minEventTimeInterval, 
+	           scoreMinThreshold, context)
 	     }
 	     
 	     //get window and add new event
@@ -81,9 +83,8 @@ object EventCluster extends JobConfiguration {
 	     window.add(event)
 	     state.update(window)
 	     
-	     val score = window.getScore()
-	     val alarmOn = score > scoreMinThreshold
-	     (entityID,timeStamp.get , alarmOn)
+	     val alarmOn = window.isTriggered()
+	     (entityID, timeStamp.get, alarmOn)
 	   }
 	   
 	   //extract time stamp
