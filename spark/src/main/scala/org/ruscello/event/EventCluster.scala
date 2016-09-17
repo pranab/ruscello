@@ -38,33 +38,39 @@ object EventCluster extends JobConfiguration {
 
    def main(args: Array[String]) {
 	   val appName = "eventCluster"
-	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
+	   val Array(outputPath: String, configFile: String) = getCommandLineArgs(args, 2)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)
-	   val sparkCntxt = new SparkContext(sparkConf)
+	   sparkConf.set("spark.executor.memory", "1g")
 	   val appConfig = config.getConfig(appName)
 	   
 	   //config params
-	   val batchDuration = appConfig.getInt("batch.duration")
+	   val genConfig = appConfig.getConfig("general")
+	   val fieldConfig = appConfig.getConfig("field")
+	   val windowConfig = appConfig.getConfig("window")
+	   val sourceConfig = appConfig.getConfig("source")
+	   val clustConfig = appConfig.getConfig("clustering")
+	   
+	   val batchDuration = genConfig.getInt("batch.duration")
 	   val strContxt = new StreamingContext(sparkConf, Seconds(batchDuration))
-	   val source = config.getString("stream.source")
-	   strContxt.checkpoint(appConfig.getString("checkpoint.dir"))
-	   val keyFieldOrdinals = appConfig.getIntList("key.field.ordinals").asScala
-	   val timeStampFieldOrdinal = appConfig.getInt("timeStamp.field.ordinal")
-	   val windowTimeSpan = appConfig.getLong("window.timeSpan")
-	   val windowTimeStep = appConfig.getLong("window.timeStep")
-	   val minOccurence = appConfig.getInt("window.minOccurence")
-	   val maxIntervalAverage: Long = appConfig.getLong("window.maxIntervalAverage")
-	   val maxIntervalMax: Long = appConfig.getLong("window.maxIntervalMax")
-	   val minRangeLength: Long = appConfig.getLong("window.minRangeLength")
-	   val strategies = appConfig.getStringList("clustering.strategies")
-	   val anyCond = appConfig.getBoolean("any.cond")
-	   val fieldDelimIn = appConfig.getString("field.delim.in")
-	   val scoreMinThreshold = appConfig.getDouble("window.scoreMinThreshold")
-	   val duration = appConfig.getInt("run.duration")
-	   val debugOn = appConfig.getBoolean("debug.on")
-	   val outputFilePrefix = appConfig.getString("output.file.prefix")
-	   val minEventTimeInterval = appConfig.getLong("window.minEventTimeInterval")
+	   val source = genConfig.getString("stream.source")
+	   strContxt.checkpoint(genConfig.getString("checkpoint.dir"))
+	   val keyFieldOrdinals = fieldConfig.getIntList("key.ordinals").asScala
+	   val timeStampFieldOrdinal = fieldConfig.getInt("timeStamp.ordinal")
+	   val windowTimeSpan = windowConfig.getLong("timeSpan")
+	   val windowTimeStep = windowConfig.getLong("timeStep")
+	   val minOccurence = windowConfig.getInt("minOccurence")
+	   val maxIntervalAverage: Long = windowConfig.getLong("maxIntervalAverage")
+	   val maxIntervalMax: Long = windowConfig.getLong("maxIntervalMax")
+	   val minRangeLength: Long = windowConfig.getLong("minRangeLength")
+	   val strategies = clustConfig.getStringList("strategies")
+	   val anyCond = clustConfig.getBoolean("any.cond")
+	   val fieldDelimIn = fieldConfig.getString("delim.in")
+	   val scoreMinThreshold = windowConfig.getDouble("scoreMinThreshold")
+	   val duration = genConfig.getInt("run.duration")
+	   val debugOn = genConfig.getBoolean("debug.on")
+	   val saveOutput = genConfig.getBoolean("save.output")
+	   val minEventTimeInterval = windowConfig.getLong("minEventTimeInterval")
 	     
 	   //state update function
 	   val  stateUpdateFunction = (entityID: Record, timeStamp: Option[Long], 
@@ -84,7 +90,11 @@ object EventCluster extends JobConfiguration {
 	     state.update(window)
 	     
 	     val alarmOn = window.isTriggered()
-	     (entityID, timeStamp.get, alarmOn)
+	     val result = (entityID, timeStamp.get, alarmOn)
+	     if (debugOn) {
+	       println(result)
+	     }
+	     result
 	   }
 	   
 	   //extract time stamp
@@ -94,15 +104,31 @@ object EventCluster extends JobConfiguration {
 	     fields(timeStampFieldOrdinal).toLong
 	   })
 	   
+	   if (debugOn) {
+	     tsStrm.foreach(rdd => {
+	       val count = rdd.count
+	       println("*** num of records: " + count)
+	       rdd.foreach(r => {
+	         println("*** key: " + r._1 + "timestamp: " + r._2 )
+	       })
+	     })
+	   }
+	   
+	   
 	   val spec = StateSpec.function(stateUpdateFunction)
 	   val mappedStatefulStream = tsStrm.mapWithState(spec)
 	   
-	   if (debugOn) {
-	     mappedStatefulStream.print
+	   if (false) {
+	     mappedStatefulStream.foreach(rdd => {
+	       rdd.foreach(r => {
+	         println("*** key: " + r._1 + "timestamp: " + r._2 + "alarm: " + r._3)
+	       })
+	     })
 	   }
 	 
 	   //output
-	   mappedStatefulStream.saveAsTextFiles(outputFilePrefix)
+	   if (saveOutput)
+		   mappedStatefulStream.saveAsTextFiles(outputPath)
 	   
 	   // start our streaming context and wait for it to "finish"
 	   strContxt.start()
