@@ -14,17 +14,14 @@ The following blogs of mine are good source of details. These are the only sourc
 of detail documentation. 
 
 * https://pkghosh.wordpress.com/2015/02/19/real-time-detection-of-outliers-in-sensor-data-using-spark-streaming/
+* https://pkghosh.wordpress.com/2016/09/19/alarm-flooding-control-with-event-clustering-using-spark-streaming/
+
 
 ## Build
-* Build hoidla
-mvn clean install
-sbt publishLocal
+* Build hoidla:  mvn clean install; sbt publishLocal
 
-* Build chombo-spark
-mvn clean install
-sbt publishLocal
+* Build chombo-spark:  mvn clean install; sbt publishLocal
 
-* Build ruscello
-sbt package
+* Build ruscello:  sbt package
 
 
