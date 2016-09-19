@@ -1,0 +1,59 @@
+This tutorial is about about controlling alarm flooding from real time event streams. It use simple
+intuitive clustering algorithms to detect event cluster. You should modify the various scripts and 
+configuration files based on your needs and environment.
+
+Environment
+===========
+Following are the development and run time environment requirements
+- java
+- scala
+- spark
+- Hadoop HDFS
+- python
+- maven
+- sbt
+
+Build
+=====
+Build hoidla
+mvn clean install
+sbt publishLocal
+
+Build chombo-spark
+mvn clean install
+sbt publishLocal
+
+Build ruscello
+sbt package
+
+Uber jar
+========
+I build an user jar using ant as follows. You may want to multiple  jars in Spark
+ant -f ruscello.xml 
+
+Event stream generation
+=======================
+In on terminal run
+./event_clust.py <mum_host_app> <num_error_types> <num_events>  <port>
+
+where
+<mum_host_app> = number of hosts and application e.g. 2
+<num_error_types> = number of error types e.g. 100
+<num_events> = number of events e.g. 1000
+<port> = TCP port e.g 9147 (same port number should be configured in Spark application configuration)
+
+Spark streaming application
+===========================
+./evtclust.sh
+
+Output
+======
+You can browse output in Spark web console. To save alarm output in files, you should set save.output
+to true
+
+Configuration
+=============
+Sample configuration is in the file evtclust.conf. It's a Typesafe configuration file
+
+
+

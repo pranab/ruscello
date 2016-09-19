@@ -77,6 +77,9 @@ object EventCluster extends JobConfiguration {
 	       state: State[TimeBoundEventLocalityAnalyzer]) => {
 	         
 	     def getWindow() : TimeBoundEventLocalityAnalyzer = {
+	       if (false)
+	         println("*** creating window")
+	         
 	       val context = new EventLocality.Context(minOccurence, maxIntervalAverage, maxIntervalMax, 
 	           minRangeLength, strategies, anyCond)
 	       new TimeBoundEventLocalityAnalyzer(windowTimeSpan, windowTimeStep,  minEventTimeInterval, 
@@ -91,7 +94,7 @@ object EventCluster extends JobConfiguration {
 	     
 	     val alarmOn = window.isTriggered()
 	     val result = (entityID, timeStamp.get, alarmOn)
-	     if (debugOn) {
+	     if (debugOn && result._3) {
 	       println(result)
 	     }
 	     result
@@ -104,12 +107,12 @@ object EventCluster extends JobConfiguration {
 	     fields(timeStampFieldOrdinal).toLong
 	   })
 	   
-	   if (debugOn) {
+	   if (false) {
 	     tsStrm.foreach(rdd => {
 	       val count = rdd.count
 	       println("*** num of records: " + count)
 	       rdd.foreach(r => {
-	         println("*** key: " + r._1 + "timestamp: " + r._2 )
+	         println("*** key: " + r._1 + " timestamp: " + r._2 )
 	       })
 	     })
 	   }
@@ -119,16 +122,31 @@ object EventCluster extends JobConfiguration {
 	   val mappedStatefulStream = tsStrm.mapWithState(spec)
 	   
 	   if (false) {
+	     println("*** state stream")
 	     mappedStatefulStream.foreach(rdd => {
 	       rdd.foreach(r => {
-	         println("*** key: " + r._1 + "timestamp: " + r._2 + "alarm: " + r._3)
+	         println("*** key: " + r._1 + " timestamp: " + r._2 + "alarm: " + r._3)
 	       })
 	     })
 	   }
 	 
+	   //alarm stream
+	   val alarmStream = mappedStatefulStream.filter(r => {
+	     r._3
+	   })
+
+	   if (false) {
+	     println("*** alarms" )
+	     alarmStream.foreach(rdd => {
+	       rdd.foreach(r => {
+	         println(r)
+	       })
+	     })
+	   }	
+	   
 	   //output
 	   if (saveOutput)
-		   mappedStatefulStream.saveAsTextFiles(outputPath)
+		   alarmStream.saveAsTextFiles(outputPath)
 	   
 	   // start our streaming context and wait for it to "finish"
 	   strContxt.start()
