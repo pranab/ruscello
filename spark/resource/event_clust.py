@@ -51,14 +51,14 @@ def gen_data(num_hosts,num_error_types,num_events,messages,mlock):
 	#generate events
 	time_ms = curTimeMs() - 30 * 24 * 60 * 60 * 1000
 	av_cluster_gap = num_events / 20;
-	next_cluster_gap = av_cluster_gap / 2 + randint(1, av_cluster_gap)
+	next_cluster_gap = av_cluster_gap  + randint(1, av_cluster_gap / 2)
 	inter_cluster_counter = 0
 	cluster_mode = False
-	clust_event_interval_base = 200
-	clust_event_interval_dev = 160
-	event_interval_base = 1000
-	event_interval_dev = 1000
-
+	clust_event_interval_base = 180
+	clust_event_interval_dev = 140
+	event_interval_base = 3000
+	event_interval_dev = 2000
+	beg_time = time_ms
 	for i in range(num_events):
 		if cluster_mode:
 			delta = clust_event_interval_base + randint(1, clust_event_interval_dev)
@@ -75,17 +75,19 @@ def gen_data(num_hosts,num_error_types,num_events,messages,mlock):
 			if randint(0, 100) < 10:
 				(host, app) = sel_host_app(hosts,apps)
 				event = selectRandomFromList(app_errors[app])
-				time_ms += randint(100,1000)
+				delta = randint(100,300)
+				time.sleep(float(delta) / 1000)
+				time_ms += delta
 				msg =  "%s,%s,%d,%d" %(host, app, event, time_ms)
 				with mlock:
 					messages.append(msg)
 			
 			# cluster end
 			if (cluster_progress_counter == cluster_size):
-				#print "ending cluster"
+				print "ending cluster"
 				cluster_mode = False
 				inter_cluster_counter = 0
-				next_cluster_gap = av_cluster_gap / 2 + randint(1, av_cluster_gap)
+				next_cluster_gap = av_cluster_gap  + randint(1, av_cluster_gap / 2)
 		else:
 			(host, app) = sel_host_app(hosts,apps)
 			event = selectRandomFromList(app_errors[app])
@@ -101,13 +103,18 @@ def gen_data(num_hosts,num_error_types,num_events,messages,mlock):
 			# cluster start
 			if inter_cluster_counter == next_cluster_gap:
 				inter_cluster_counter = 0
-				#print "starting cluster"
+				print "starting cluster"
 				cluster_mode = True
-				cluster_size = 30 + random.randint(1, 20)
+				cluster_size = 100 + random.randint(1, 30)
+				if (random.randint(1, 100) < 20):
+					cluster_size *= 2 
 				cluster_progress_counter = 0
 				(clust_host, clust_app) = sel_host_app(hosts,apps)
 				cluster_event = selectRandomFromList(app_errors[clust_app])
-			
+				
+	end_time = time_ms		
+	print "elapsed time: %d" %(end_time  - beg_time)
+	
 #### main ###		
 start_new_thread(gen_data ,(num_hosts,num_error_types,num_events,messages,mlock, ))
 print "started data generation thread"
