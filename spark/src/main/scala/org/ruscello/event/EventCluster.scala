@@ -61,8 +61,10 @@ object EventCluster extends JobConfiguration {
 	   val windowTimeStep = windowConfig.getLong("timeStep")
 	   val minOccurence = windowConfig.getInt("minOccurence")
 	   val maxIntervalAverage: Long = windowConfig.getLong("maxIntervalAverage")
-	   val maxIntervalMax: Long = windowConfig.getLong("maxIntervalMax")
-	   val minRangeLength: Long = windowConfig.getLong("minRangeLength")
+	   val findClusterWithin = windowConfig.getBoolean("findClusterWithin")
+	   val minClusterSize = windowConfig.getLong("minClusterSize")
+	   val maxIntervalMax = windowConfig.getLong("maxIntervalMax")
+	   val minRangeLength = windowConfig.getLong("minRangeLength")
 	   val strategies = clustConfig.getStringList("strategies")
 	   val anyCond = clustConfig.getBoolean("any.cond")
 	   val fieldDelimIn = fieldConfig.getString("delim.in")
@@ -80,8 +82,8 @@ object EventCluster extends JobConfiguration {
 	       if (false)
 	         println("*** creating window")
 	         
-	       val context = new EventLocality.Context(minOccurence, maxIntervalAverage, maxIntervalMax, 
-	           minRangeLength, strategies, anyCond)
+	       val context = new EventLocality.Context(minOccurence, maxIntervalAverage, findClusterWithin, minClusterSize, 
+	           maxIntervalMax, minRangeLength, strategies, anyCond)
 	       new TimeBoundEventLocalityAnalyzer(windowTimeSpan, windowTimeStep,  minEventTimeInterval, 
 	           scoreMinThreshold, context)
 	     }
