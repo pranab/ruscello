@@ -80,6 +80,11 @@ object AutoCorrelation extends JobConfiguration {
 	  val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	  val saveOutput = getBooleanParamOrElse(appConfig, "save.output", true)
 
+	  if (debugOn) {
+		  val keys = meanValueMap.keySet().asScala
+		  keys.foreach(k => println(k + " -> " + meanValueMap.get(k)))
+	  }
+	  
 	  //input
 	  val data = sparkCntxt.textFile(inputPath)
 	  
@@ -158,6 +163,9 @@ object AutoCorrelation extends JobConfiguration {
 	      
 	      val statsKey = key.toString(0, key.size-3)
 	      val mean = meanValueMap.get(statsKey)
+	      if (null == mean) {
+	        throw new IllegalStateException("stats not found for " + statsKey)
+	      }
 	      val lagDiff = pair._1.getDouble(2) - mean
 	      val curDiff = pair._2.getDouble(2) - mean
 	      
@@ -194,6 +202,7 @@ object AutoCorrelation extends JobConfiguration {
 	    var ac = 0.0
 	    if (v.getDouble(1) > 0) {
 	    	ac = v.getDouble(0) / v.getDouble(1)
+	    	ac = BasicUtils.between(ac, -1.0, 1.0)
 	    }
 	    ac
 	  })
