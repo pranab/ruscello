@@ -29,4 +29,10 @@ Please refer to spark_dpendency.txt for details
 
 * Build ruscello:  sbt package
 
+## Help
+Please feel free to email me at pkghosh99@gmail.com
+
+## Contribution
+Contributors are welcome. Please email me at pkghosh99@gmail.com
+
 
