@@ -67,6 +67,8 @@ object TemporalAggregator extends JobConfiguration {
 	     BasicUtils.toEpochTime(aggrWindowTimeUnit) * aggrWindowTimeLength / 1000
 	   }
 	   val aggrType = getStringParamOrElse(appConfig, "aggr.type", "average") 
+	   val validAggregations = Array("count", "sum", "average", "stdDev", "minMax")
+	   assertStringMember(aggrType, validAggregations, "invalid aggregation type " + aggrType)
 	   val outputCompact = getBooleanParamOrElse(appConfig, "output.compact", true)
 	   val outputPrecision = this.getIntParamOrElse(appConfig, "output.precision", 3)
 	   
@@ -97,19 +99,26 @@ object TemporalAggregator extends JobConfiguration {
 			   key.addInt(fld)
 			   
 			   val fieldVal = fields(fld).toDouble
-			   val value = Record(2)
-			   if (aggrType.equals("minMax")) {
+			   //val value = Record(2)
+			   val count = 1
+			   val value =  if (aggrType.equals("minMax")) {
+			     val value = Record(2)
 			     value.add(fieldVal, fieldVal)
+			     value
+			   } else  if (aggrType.equals("stdDev")) {
+			     val value = Record(3)
+			     value.add(count, fieldVal, fieldVal * fieldVal)
+			     value
 			   } else {
-			     val count = 1
+			     val value = Record(2)
 			     value.add(count, fieldVal)
+			     value
 			   }
 			   (key, value)
 		   })
 		   
 		   recs
 	  })
-	  
 	  
 	  //reduce
 	  val redData = if (aggrType.equals("minMax")) {
@@ -118,6 +127,15 @@ object TemporalAggregator extends JobConfiguration {
 	      val max = if (v1.getDouble(1) > v2.getDouble(1)) v1.getDouble(1) else v2.getDouble(1)
 	      val newVal = Record(2)
 	      newVal.add(min, max)
+	      newVal
+	    })
+	  } else if (aggrType.equals("stdDev")){
+	    keyedData.reduceByKey((v1,v2) => {
+	      val count = v1.getInt(0) + v2.getInt(0)
+	      val sum = v1.getDouble(1) + v2.getDouble(1)
+	      val sumSq	 = v1.getDouble(2) + v2.getDouble(2)
+	      val newVal = Record(3)
+	      newVal.add(count, sum, sumSq)
 	      newVal
 	    })
 	  } else {
@@ -148,6 +166,17 @@ object TemporalAggregator extends JobConfiguration {
 	        value.addDouble(v.getDouble(1) /  v.getInt(0))
 	        value
 	      }
+	      case "stdDev" => {
+	        val value = Record(2)
+	        val count = v.getInt(0)
+	        val sum = v.getDouble(1)
+	        val sumSq= v.getDouble(2)
+	        val av = sum / count
+	        val va = ((sumSq / count - av * av) * (count - 1)) / count
+	        val sd = Math.sqrt(va)
+	        value.add(av, sd)
+	        value
+	      }
 	      case "minMax" => {
 	        val value = Record(v)
 	        value
@@ -165,7 +194,7 @@ object TemporalAggregator extends JobConfiguration {
 	      val key = r._1
 	      val value = r._2
 	      val newKey = Record(key, 0, key.size - 1)
-	      val newValue = if (aggrType.equals("minMax")) {
+	      val newValue = if (aggrType.equals("minMax") || aggrType.equals("stdDev")) {
 		    val newValue = Record(3)
 		    newValue.addInt(key.getInt(key.size - 1))
 		    newValue.addDouble(value.getDouble(0))
@@ -184,7 +213,7 @@ object TemporalAggregator extends JobConfiguration {
 	      values.sortBy(v => v.getInt(0))
 	      val aggrValues = values.map(v => {
 	        val str = BasicUtils.formatDouble(v.getDouble(1), outputPrecision)
-	        if (aggrType.equals("minMax")) {
+	        if (aggrType.equals("minMax") || aggrType.equals("stdDev")) {
 	          str + fieldDelimOut + BasicUtils.formatDouble(v.getDouble(2), outputPrecision)
 	        } else {
 	          str
