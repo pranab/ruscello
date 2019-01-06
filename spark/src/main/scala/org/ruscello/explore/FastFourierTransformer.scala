@@ -57,9 +57,12 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	       "missing time stamp field ordinal")
 	   val keyLen = getOptinalArrayLength(keyFieldOrdinals, 1)
 	   val samplingFreq = 1.0 / getMandatoryDoubleParam(appConfig, "samplig.interval", "missing sampling interval")
+	   val samplingIntervalUnit = getStringParamOrElse(appConfig, "sampling.intervalUnit", "sec")
 	   val outputPrecision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val numFreqOutput = getIntParamOrElse(appConfig, "num.FreqOutput", 16)
 	   val maxSampleSize = getIntParamOrElse(appConfig, "max.sampleSize", 4096)
+	   val outputPeriod = getBooleanParamOrElse(appConfig, "output.period", false)
+	   val outputPeriodUnit = getOptionalStringParam(appConfig, "output.periodUnit")
 	   
 	   val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	   val saveOutput = getBooleanParamOrElse(appConfig, "save.output", true)
