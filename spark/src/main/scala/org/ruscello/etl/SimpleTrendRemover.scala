@@ -34,7 +34,7 @@ object SimpleTrendRemover extends JobConfiguration with GeneralUtility {
    * @return
    */
    def main(args: Array[String]) {
-	   val appName = "temporalAggregator"
+	   val appName = "simpleTrendRemover"
 	   val Array(inputPath: String, outputPath: String, configFile: String) = getCommandLineArgs(args, 3)
 	   val config = createConfig(configFile)
 	   val sparkConf = createSparkConf(appName, config, false)

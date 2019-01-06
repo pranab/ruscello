@@ -25,13 +25,14 @@ import org.chombo.util.SeasonalAnalyzer
 import org.chombo.spark.common.SeasonalUtility
 import org.chombo.util.BasicUtils
 import scala.collection.mutable.ArrayBuffer
+import org.chombo.spark.common.GeneralUtility
 
 
 /**
  * Auto correlation
  * @author pranab
  */
-object AutoCorrelation extends JobConfiguration {
+object AutoCorrelation extends JobConfiguration with GeneralUtility {
   
    /**
     * @param args
@@ -45,15 +46,12 @@ object AutoCorrelation extends JobConfiguration {
 	   val sparkCntxt = new SparkContext(sparkConf)
 	   val appConfig = config.getConfig(appName)
 	   
-	   //configurations
-	   val fieldDelimIn = getStringParamOrElse(appConfig, "field.delim.in", ",")
-	   val fieldDelimOut = getStringParamOrElse(appConfig, "field.delim.out", ",")
-	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrdinal", "missing sequence filed ordinal")
-	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
-	   val keyFieldOrdinals = keyFields match {
-	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
-	     case None => None  
-	   }
+	  //configurations
+	  val fieldDelimIn = getStringParamOrElse(appConfig, "field.delim.in", ",")
+	  val fieldDelimOut = getStringParamOrElse(appConfig, "field.delim.out", ",")
+	  val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.fieldOrdinal", "missing sequence filed ordinal")
+	  val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
+	  val keyFieldOrdinals = toOptionalIntArray(keyFields)
 	  val numAttrOrdinals = getMandatoryIntListParam(appConfig, "attr.ordinals", 
 	      "missing quant attribute ordinals").asScala.toArray
 	  val corrLags = getMandatoryIntListParam(appConfig, "coor.lags", "missing correlation lags").asScala.toArray
@@ -65,7 +63,7 @@ object AutoCorrelation extends JobConfiguration {
 	  var keyLen = 0
 	  var keyDefined = true
 	  keyFieldOrdinals match {
-	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
+	    case Some(fields : Array[Int]) => keyLen +=  fields.length
 	    case None => keyDefined = false
 	  }
 	  keyLen += 4
@@ -94,7 +92,7 @@ object AutoCorrelation extends JobConfiguration {
 		  data.map(line => {
 			   val fields = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 			   val key = Record(keyLen - 3)
-	           Record.populateFields(fields, keyFieldOrdinals, key)
+	           populateFields(fields, keyFieldOrdinals, key)
 	           val seq = fields(seqFieldOrd).toLong
 	           key.addLong(seq)
 	           (key, line)
@@ -250,10 +248,10 @@ object AutoCorrelation extends JobConfiguration {
    * @param includeAppConfig
    * @return
    */ 
-   def buildKey(fld:Int, lag:Integer, firstSeq: Int, secondSeq: Int, keyLen:Int, keyFieldOrdinals:Option[Array[Integer]], 
+   def buildKey(fld:Int, lag:Integer, firstSeq: Int, secondSeq: Int, keyLen:Int, keyFieldOrdinals:Option[Array[Int]], 
       items: Array[String]) : Record = {
        val key = Record(keyLen)
-       Record.populateFields(items, keyFieldOrdinals, key)
+       populateFields(items, keyFieldOrdinals, key)
        key.addInt(fld)
        key.addInt(lag)
        key.addInt(firstSeq)
