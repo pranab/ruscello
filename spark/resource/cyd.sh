@@ -3,7 +3,7 @@
 PROJECT_HOME=/Users/pranab/Projects
 CHOMBO_JAR_NAME=$PROJECT_HOME/bin/chombo/uber-chombo-spark-1.0.jar
 RUSCELLO_JAR_NAME=$PROJECT_HOME/bin/ruscello/uber-ruscello-spark-1.0.jar
-MASTER=spark://akash:7077
+MASTER=spark://akash.local:7077
 
 case "$1" in
 
@@ -47,6 +47,16 @@ case "$1" in
 	INPUT=file:///Users/pranab/Projects/bin/ruscello/input/auc/eusage.txt
 	OUTPUT=file:///Users/pranab/Projects/bin/ruscello/output/auc
 	rm -rf ./output/auc
+	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
+	--conf spark.ui.killEnabled=true --master $MASTER $RUSCELLO_JAR_NAME  $INPUT $OUTPUT cyd.conf
+;;
+
+"fft")
+	echo "running FastFourierTransformer Spark job"
+	CLASS_NAME=org.ruscello.explore.FastFourierTransformer
+	INPUT=file:///Users/pranab/Projects/bin/ruscello/input/teg/eusage.txt
+	OUTPUT=file:///Users/pranab/Projects/bin/ruscello/output/fft
+	rm -rf ./output/fft
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
 	--conf spark.ui.killEnabled=true --master $MASTER $RUSCELLO_JAR_NAME  $INPUT $OUTPUT cyd.conf
 ;;

@@ -59,6 +59,7 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	   val samplingFreq = 1.0 / getMandatoryDoubleParam(appConfig, "samplig.interval", "missing sampling interval")
 	   val outputPrecision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val numFreqOutput = getIntParamOrElse(appConfig, "num.FreqOutput", 16)
+	   val maxSampleSize = getIntParamOrElse(appConfig, "max.sampleSize", 4096)
 	   
 	   val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	   val saveOutput = getBooleanParamOrElse(appConfig, "save.output", true)
@@ -81,7 +82,11 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	   }).groupByKey.flatMap(r => {
 	     val key = r._1
 	     val va = r._2.toArray.sortBy(v => v._1)
-	     val newLength = MathUtils.binaryPowerFloor(va.length)
+	     var newLength = MathUtils.binaryPowerFloor(va.length)
+	     if (debugOn)
+	       println("sample size " + va.length + " modifield " + newLength)
+	       
+	     newLength = if (newLength > maxSampleSize) maxSampleSize else newLength
 	     val half = newLength / 2
 	     val freqDelta = samplingFreq / half
 	     
@@ -96,7 +101,8 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	   }).sortByKey(true, 1)
 	   
 	   val formattedOutput = fftOutput.map(r => {
-	     r._1.toString + fieldDelimOut + BasicUtils.formatDouble(r._2._1, outputPrecision) + 
+	     
+	     r._1.toString(fieldDelimOut) + fieldDelimOut + BasicUtils.formatDouble(r._2._1, outputPrecision) + 
 	     	fieldDelimOut + BasicUtils.formatDouble(r._2._2, outputPrecision)
 	   })
 	   
