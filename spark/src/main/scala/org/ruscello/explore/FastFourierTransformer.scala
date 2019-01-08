@@ -61,7 +61,7 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	   val outputPrecision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val numFreqOutput = getIntParamOrElse(appConfig, "num.FreqOutput", 16)
 	   val maxSampleSize = getIntParamOrElse(appConfig, "max.sampleSize", 4096)
-	   val outputPeriod = getBooleanParamOrElse(appConfig, "output.period", false)
+	   //val outputPeriod = getBooleanParamOrElse(appConfig, "output.period", false)
 	   val outputPeriodUnit = getOptionalStringParam(appConfig, "output.periodUnit")
 	   
 	   val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
@@ -70,7 +70,7 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	   //input
 	   val data = sparkCntxt.textFile(inputPath)
 	   
-	   val fftOutput = data.flatMap(line => {
+	   var fftOutput = data.flatMap(line => {
 		   val fields = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 		   val ts = fields(timeStampFieldOrdinal).toLong
 		   val baseKey =  Record(keyLen)
@@ -98,15 +98,46 @@ object FastFourierTransformer extends JobConfiguration with GeneralUtility {
 	     val fftOutput = FastFourierTransform.fft(fftInput).slice(0, numFreqOutput)
 	     val amplitudes = fftOutput.map(v => v.abs())
 	     amplitudes.zipWithIndex.map(v => {
-	       val res = (v._2 * freqDelta, v._1)
-	       (key, res)
+	       val value = Record(2)
+	       value.add(v._2 * freqDelta, v._1)
+	       (key, value)
 	     })
-	   }).sortByKey(true, 1)
+	   })
+	   
+	   //convert to period if necessary
+	   fftOutput = outputPeriodUnit match {
+	     case Some(perUnit) => {
+	       if (debugOn)
+	         println("comverting to period")
+	       val fftInPeriod = fftOutput.mapValues(v => {
+	         val freq = v.getDouble(0)
+	         val period = if (freq == 0){ 
+	        	 "DC" 
+	           } else {
+        	     val per = if (!perUnit.equals(samplingIntervalUnit)) {
+        		   BasicUtils.convertTimeUnit(1.0 / freq, samplingIntervalUnit, perUnit)
+        	     } else {
+        	       1.0 / freq
+        	     }
+        	     BasicUtils.formatDouble(per, outputPrecision)
+	         }
+	         val newValue = Record(2)
+	         newValue.add(period, v.getDouble(1))
+	         newValue
+	       })
+	       fftInPeriod
+	     }
+	     case None => {
+	       if (debugOn)
+	         println("no conversion to period")
+	       fftOutput
+	     }
+	   }
+	   
+	   fftOutput = fftOutput.sortByKey(true, 1)
 	   
 	   val formattedOutput = fftOutput.map(r => {
-	     
-	     r._1.toString(fieldDelimOut) + fieldDelimOut + BasicUtils.formatDouble(r._2._1, outputPrecision) + 
-	     	fieldDelimOut + BasicUtils.formatDouble(r._2._2, outputPrecision)
+	     r._1.toString(fieldDelimOut) + fieldDelimOut + r._2.withFloatPrecision(outputPrecision).toString(fieldDelimOut)
 	   })
 	   
 	  if (debugOn) {

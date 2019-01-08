@@ -54,7 +54,7 @@ case "$1" in
 "fft")
 	echo "running FastFourierTransformer Spark job"
 	CLASS_NAME=org.ruscello.explore.FastFourierTransformer
-	INPUT=file:///Users/pranab/Projects/bin/ruscello/input/teg/eusage.txt
+	INPUT=file:///Users/pranab/Projects/bin/ruscello/input/fft/eusage.txt
 	OUTPUT=file:///Users/pranab/Projects/bin/ruscello/output/fft
 	rm -rf ./output/fft
 	$SPARK_HOME/bin/spark-submit --class $CLASS_NAME   \
