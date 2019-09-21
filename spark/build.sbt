@@ -20,7 +20,8 @@ libraryDependencies ++=Seq(
   "org.scalatest" % "scalatest_2.10" % "2.0" % "test",
   "mawazo" %% "hoidla" % "1.0",
   "org.chombo" %% "chombo-spark" % "1.0",
-  "mawazo" %% "chombo" % "1.0"
+  "mawazo" %% "chombo" % "1.0",
+  "gov.nist.math" % "jama" % "1.0.3"
 )
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
