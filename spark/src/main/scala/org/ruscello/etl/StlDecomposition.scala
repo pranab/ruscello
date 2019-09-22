@@ -28,6 +28,11 @@ import org.chombo.math.MathUtils
 import org.hoidla.window.WindowUtils
 
 
+/**
+ * decomposes time series into trend, deasonality and remainder with STL algorithm
+ * @param args
+ * @return
+ */
 object StlDecomposition extends JobConfiguration with GeneralUtility {
   
    /**
@@ -54,6 +59,7 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	   val levelLoessSize = getMandatoryIntParam(appConfig, "level.loessSize", "missing level loess size")
 	   val seasonalLoessSize = getMandatoryIntParam(appConfig, "seasonal.loessSize", "missing seasonal loess size")
 	   val trendLoessSize = getMandatoryIntParam(appConfig, "trend.loessSize", "missing trend loess size")
+	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
 	   
@@ -61,7 +67,7 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 
 	   //read input
 	   val data = sparkCntxt.textFile(inputPath)
-	   var taggedData = data.map(line => {
+	   val decomposeddData = data.map(line => {
 		   val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
 		   val keyRec = Record(items, keyFieldOrdinals)
 		   val valRec = Record(2)
@@ -73,14 +79,15 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	     val valuesWithSeq = r._2.toArray.sortWith((v1, v2) => v1.getLong(0) < v2.getLong(0))
 	     val values = valuesWithSeq.map(r => r.getDouble(1))
 	     val size = values.length
-	     
+	     var trendValues = Array[Double]()
+	     var seasonalValues = Array[Double]()
+	     var detrendedValues = values
 	     
 	     for (ou <- 0 to outerIterCount) {
-	       var detrendedValues = values
 	       for (in <- 0 to innerIterCount) {
 		     val seasonalSubSeq = Array.ofDim[Array[Double]](seasonalPeriod)
 		     
-		     //all seasonal index
+		     //values for all seasonal index
 		     for (i <- 0 to seasonalPeriod-1) {
 		       val subSeq = ArrayBuffer[Double]()
 		       for (j <- i to (detrendedValues.length-1) by seasonalPeriod) {
@@ -89,22 +96,25 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		       
 		       //smooth it
 		       val subSeqArr = subSeq.toArray
-		       val size = subSeqArr.length
 		       MathUtils.loessSmooth(subSeqArr, seasonalLoessSize)
 		       
 		       seasonalSubSeq(i) = subSeqArr
 		     }
 		     
-		     //reconstruct 
+		     //sanity check
+		     val totLength = seasonalSubSeq.map(a => a.length).reduce((l1,l2) => l1 + l2)
+		     BasicUtils.assertCondition(totLength == size, "seasonal sub sequence total length does not match")
+		     
+		     //reconstruct from seasonal sub series
 		     val smoothedValues = Array[Double](size)
 		     var vi = 0
-		     for (i <- 0 to seasonalPeriod-1) {
+		     var i = 0
+		     while (vi < size) {
 		       seasonalSubSeq.foreach(a => {
-		         if (i <= a.length-1) {
 		           smoothedValues(vi) = a(i)
 		           vi += 1
-		         } 
 		       })
+		       i += 1
 		     }
 		     
 		     //pad cycle at each end
@@ -121,18 +131,36 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		         " does not match with original " + size)
 		     
 		     //seasonal
-		     val seasonalValues = MathUtils.subtractVector(smoothedValues, levelValues)
+		     seasonalValues = MathUtils.subtractVector(smoothedValues, levelValues)
 		     
 		     //trend
-		     val trendValues = MathUtils.subtractVector(values, seasonalValues)
+		     trendValues = MathUtils.subtractVector(values, seasonalValues)
 		     MathUtils.loessSmooth(trendValues, trendLoessSize)
 		     
 		     //dtrended values
 		     detrendedValues = MathUtils.subtractVector(values, trendValues)
 	       }
 	     }
-	     List()
+	     val remainder = MathUtils.subtractVector(detrendedValues, seasonalValues)
+	     
+	     (0 to size-1).map(i => {
+	       val stBld = new StringBuilder(keyRec.toString(fieldDelimOut))
+	       stBld.append(fieldDelimOut).append(valuesWithSeq(i).getLong(0)).append(fieldDelimOut).
+	         append(BasicUtils.formatDouble(values(i), precision)).append(fieldDelimOut).
+	         append(BasicUtils.formatDouble(trendValues(i), precision)).append(fieldDelimOut).
+	         append(BasicUtils.formatDouble(seasonalValues(i), precision)).append(fieldDelimOut).
+	         append(BasicUtils.formatDouble(remainder(i), precision))
+	       stBld.toString
+	     })
 	   })
+	   if (debugOn) {
+         val records = decomposeddData.collect
+         records.slice(0, 50).foreach(r => println(r))
+	   }
+	   
+	   if(saveOutput) {	   
+	     decomposeddData.saveAsTextFile(outputPath) 
+	   }	 
 	   
    }
 }
