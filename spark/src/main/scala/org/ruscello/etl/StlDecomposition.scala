@@ -86,6 +86,9 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	     for (ou <- 0 to outerIterCount) {
 	       for (in <- 0 to innerIterCount) {
 		     val seasonalSubSeq = Array.ofDim[Array[Double]](seasonalPeriod)
+		     if (debugOn) {
+		       println("seasonalSubSeq length " + seasonalSubSeq.length)
+		     }
 		     
 		     //values for all seasonal index
 		     for (i <- 0 to seasonalPeriod-1) {
@@ -96,6 +99,9 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		       
 		       //smooth it
 		       val subSeqArr = subSeq.toArray
+		       if (debugOn) {
+		         println("subseq length " + subSeqArr.length)
+		       }
 		       MathUtils.loessSmooth(subSeqArr, seasonalLoessSize)
 		       
 		       seasonalSubSeq(i) = subSeqArr
@@ -106,29 +112,38 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		     BasicUtils.assertCondition(totLength == size, "seasonal sub sequence total length does not match")
 		     
 		     //reconstruct from seasonal sub series
-		     val smoothedValues = Array[Double](size)
+		     val smoothedValues = new Array[Double](size)
 		     var vi = 0
 		     var i = 0
 		     while (vi < size) {
 		       seasonalSubSeq.foreach(a => {
-		           smoothedValues(vi) = a(i)
-		           vi += 1
+		    	 if (i < a.length) {
+		    	   //some  sub sequences may be of shorter length
+		    	   smoothedValues(vi) = a(i)
+		    	   vi += 1
+		    	 }
 		       })
 		       i += 1
 		     }
+		     BasicUtils.assertCondition(vi == size, "series reconstruction issue final index " + vi + " size " + size)
 		     
 		     //pad cycle at each end
-		     var levelValues = Array[Double](size + 2 * seasonalPeriod)
+		     var levelValues = new Array[Double](size + 2 * seasonalPeriod)
 		     Array.copy(smoothedValues, 0, levelValues, seasonalPeriod, size)
 		     Array.copy(smoothedValues, 0, levelValues, 0, seasonalPeriod)
 		     Array.copy(smoothedValues, size - seasonalPeriod, levelValues, size + seasonalPeriod, seasonalPeriod)
 		     
 		     //level with lp filter and smoothing
 		     levelValues = WindowUtils.lowPassFilter(levelValues, seasonalPeriod)
+		     val leOne = levelValues.length
 		     levelValues = WindowUtils.lowPassFilter(levelValues, seasonalPeriod)
+		     val leTwo = levelValues.length
+		     levelValues = WindowUtils.lowPassFilter(levelValues, 3)
+		     val leThree = levelValues.length
+		     
 		     MathUtils.loessSmooth(levelValues, levelLoessSize)
-		     BasicUtils.assertCondition(levelValues.length == size, "level data size " + levelValues.length + 
-		         " does not match with original " + size)
+		     BasicUtils.assertCondition(leThree == size, "level data size " + leThree + 
+		         " does not match with original " + size + " length after filters " + leOne + " " + leTwo + " " + leThree)
 		     
 		     //seasonal
 		     seasonalValues = MathUtils.subtractVector(smoothedValues, levelValues)
