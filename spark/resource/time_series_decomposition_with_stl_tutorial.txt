@@ -1,0 +1,48 @@
+This tutorial is for time series decomposition using STL algorithm as implemented on 
+Spark
+
+Environment
+===========
+Path etc in shell script and configuration file corresposnds to my environment. Please Change 
+them  as needed for your environment. Plase the python/lib directory from the project avenir 
+in ../lib w.r.t where  stl.sh is located
+
+Build
+=====
+Follow instructions in spark_dependency.txt
+
+Configuration
+=============
+Edit stl.conf as needed
+
+Generate product sale related stats
+===================================
+python seas_sale.py stat <num_products> > stat.txt
+
+where 
+num_products = number of products e.g 5
+
+Generate product sale data
+==========================
+python seas_sale.py gen stat.txt <num_days> > <output_file>
+
+where
+num_days = num of days for which to generate data e.g 100
+ 
+Copy output file to the input path as defined in stl.sh
+
+Statistic spark job
+===================
+./stl.sh numStat
+
+Copy statistic output
+=====================
+./stl.sh cpStat
+
+Auto correlation spark job
+==========================
+./stl.sh autoCor
+
+STL decomposition spark job
+============================
+/stl.sh stl

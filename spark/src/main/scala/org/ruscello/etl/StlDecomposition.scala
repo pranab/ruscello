@@ -156,12 +156,19 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		     detrendedValues = MathUtils.subtractVector(values, trendValues)
 	       }
 	     }
+	     
+	     //remainder
 	     val remainder = MathUtils.subtractVector(detrendedValues, seasonalValues)
+	     
+	     //extract average from trend
+	     val average = (trendValues.reduce((t1,t2) => t1 + t2)) / size
+	     trendValues = trendValues.map(t => t - average)
 	     
 	     (0 to size-1).map(i => {
 	       val stBld = new StringBuilder(keyRec.toString(fieldDelimOut))
 	       stBld.append(fieldDelimOut).append(valuesWithSeq(i).getLong(0)).append(fieldDelimOut).
 	         append(BasicUtils.formatDouble(values(i), precision)).append(fieldDelimOut).
+	         append(BasicUtils.formatDouble(average, precision)).append(fieldDelimOut).
 	         append(BasicUtils.formatDouble(trendValues(i), precision)).append(fieldDelimOut).
 	         append(BasicUtils.formatDouble(seasonalValues(i), precision)).append(fieldDelimOut).
 	         append(BasicUtils.formatDouble(remainder(i), precision))
