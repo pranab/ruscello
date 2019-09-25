@@ -81,6 +81,7 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	     val size = values.length
 	     var trendValues = Array[Double]()
 	     var seasonalValues = Array[Double]()
+	     var remainder = Array[Double]()
 	     var detrendedValues = values
 	     
 	     for (ou <- 0 to outerIterCount) {
@@ -155,10 +156,9 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		     //dtrended values
 		     detrendedValues = MathUtils.subtractVector(values, trendValues)
 	       }
+	       //remainder
+	       remainder = MathUtils.subtractVector(detrendedValues, seasonalValues)
 	     }
-	     
-	     //remainder
-	     val remainder = MathUtils.subtractVector(detrendedValues, seasonalValues)
 	     
 	     //extract average from trend
 	     val average = (trendValues.reduce((t1,t2) => t1 + t2)) / size
@@ -184,5 +184,20 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	     decomposeddData.saveAsTextFile(outputPath) 
 	   }	 
 	   
+   }
+   
+   /**
+   * @param remainder
+   * @param weights
+   */
+   def getRobustnessWeight(remainder:Array[Double], weights:Array[Double]) {
+     MathUtils.getAbsolute(remainder)
+     val absRem = new Array[Double](remainder.length)
+     Array.copy(remainder, 0, absRem, 0, remainder.length)
+     val median = MathUtils.getMedian(absRem)
+     val h = 6 * median
+     for (i <- 0 to remainder.length-1) {
+       weights(i) = MathUtils.biSquare(remainder(i)/h)
+     }
    }
 }
