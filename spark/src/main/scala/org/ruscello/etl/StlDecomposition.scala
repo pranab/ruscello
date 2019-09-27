@@ -83,8 +83,12 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	     var seasonalValues = Array[Double]()
 	     var remainder = Array[Double]()
 	     var detrendedValues = values
+	     val robustNessWeights = MathUtils.getFilledArray(size, 1)
 	     
 	     for (ou <- 0 to outerIterCount) {
+	       if (ou > 0){
+	    	   getRobustnessWeight(remainder, robustNessWeights)
+	       }
 	       for (in <- 0 to innerIterCount) {
 		     val seasonalSubSeq = Array.ofDim[Array[Double]](seasonalPeriod)
 		     if (debugOn) {
@@ -94,16 +98,19 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		     //values for all seasonal index
 		     for (i <- 0 to seasonalPeriod-1) {
 		       val subSeq = ArrayBuffer[Double]()
+		       val subSeqRobWeights = ArrayBuffer[Double]()
 		       for (j <- i to (detrendedValues.length-1) by seasonalPeriod) {
 		         subSeq += detrendedValues(j)
+		         subSeqRobWeights += robustNessWeights(j)
 		       }
 		       
 		       //smooth it
 		       val subSeqArr = subSeq.toArray
+		       val subSeqRobWeightsArr = subSeqRobWeights.toArray
 		       if (debugOn) {
 		         println("subseq length " + subSeqArr.length)
 		       }
-		       MathUtils.loessSmooth(subSeqArr, seasonalLoessSize)
+		       MathUtils.loessSmooth(subSeqArr, seasonalLoessSize, subSeqRobWeightsArr)
 		       
 		       seasonalSubSeq(i) = subSeqArr
 		     }
@@ -151,12 +158,13 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 		     
 		     //trend
 		     trendValues = MathUtils.subtractVector(values, seasonalValues)
-		     MathUtils.loessSmooth(trendValues, trendLoessSize)
+		     MathUtils.loessSmooth(trendValues, trendLoessSize, robustNessWeights)
 		     
 		     //dtrended values
 		     detrendedValues = MathUtils.subtractVector(values, trendValues)
 	       }
-	       //remainder
+	       
+	       //remainder 
 	       remainder = MathUtils.subtractVector(detrendedValues, seasonalValues)
 	     }
 	     
