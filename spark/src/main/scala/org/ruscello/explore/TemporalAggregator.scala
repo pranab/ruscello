@@ -15,7 +15,6 @@
  * permissions and limitations under the License.
  */
 
-
 package org.ruscello.explore
 
 import org.chombo.spark.common.JobConfiguration
@@ -25,12 +24,14 @@ import org.chombo.util.BasicUtils
 import org.chombo.util.SeasonalAnalyzer
 import com.typesafe.config.Config
 import org.chombo.spark.common.Record
+import org.chombo.spark.common.GeneralUtility
 
 /**
+ * Aggregation within aligned time window
  * @author pranab
  *
  */
-object TemporalAggregator extends JobConfiguration {
+object TemporalAggregator extends JobConfiguration with GeneralUtility {
    
   /**
    * @param args
@@ -47,12 +48,8 @@ object TemporalAggregator extends JobConfiguration {
 	   //configuration params
 	   val fieldDelimIn = getStringParamOrElse(appConfig, "field.delim.in", ",")
 	   val fieldDelimOut = getStringParamOrElse(appConfig, "field.delim.out", ",")
-	   val attrOrdinals = getMandatoryIntListParam(appConfig, "attr.ordinals").asScala.toArray
-	   val keyFields = getOptionalIntListParam(appConfig, "id.fieldOrdinals")
-	   val keyFieldOrdinals = keyFields match {
-	     case Some(fields:java.util.List[Integer]) => Some(fields.asScala.toArray)
-	     case None => None  
-	   }
+	   val attrOrdinals = toIntArray(getMandatoryIntListParam(appConfig, "attr.ordinals"))
+	   val keyFieldOrdinals = toOptionalIntArray(getOptionalIntListParam(appConfig, "id.fieldOrdinals"))
 	   val timeStampFieldOrdinal = getMandatoryIntParam(appConfig, "time.fieldOrdinal", 
 	       "missing time stamp field ordinal")
 	   val timeStampInMs = this.getBooleanParamOrElse(appConfig, "time.inMili", true)
@@ -70,15 +67,10 @@ object TemporalAggregator extends JobConfiguration {
 	   val validAggregations = Array("count", "sum", "average", "stdDev", "minMax")
 	   assertStringMember(aggrType, validAggregations, "invalid aggregation type " + aggrType)
 	   val outputCompact = getBooleanParamOrElse(appConfig, "output.compact", true)
-	   val outputPrecision = this.getIntParamOrElse(appConfig, "output.precision", 3)
+	   val outputPrecision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   
 	  //key length
-	  var keyLen = 0
-	  keyFieldOrdinals match {
-	    case Some(fields : Array[Integer]) => keyLen +=  fields.length
-	    case None => 
-	  }
-	  keyLen += 2
+	  val keyLen = getOptinalArrayLength(keyFieldOrdinals) + 2
 	  
 	  val debugOn = getBooleanParamOrElse(appConfig, "debug.on", false)
 	  val saveOutput = getBooleanParamOrElse(appConfig, "save.output", true)
@@ -94,12 +86,11 @@ object TemporalAggregator extends JobConfiguration {
 		   
 		   val recs = attrOrdinals.map(fld => {
 			   val key = Record(keyLen)
-			   Record.populateFields(fields, keyFieldOrdinals, key)
+			   Record.populateFieldsWithIndex(fields, keyFieldOrdinals, key)
 			   key.addLong(tsPart)
 			   key.addInt(fld)
 			   
 			   val fieldVal = fields(fld).toDouble
-			   //val value = Record(2)
 			   val count = 1
 			   val value =  if (aggrType.equals("minMax")) {
 			     val value = Record(2)
