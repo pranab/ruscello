@@ -101,7 +101,6 @@ object TemporalSelector extends JobConfiguration with GeneralUtility {
 	    val alignedTime = r._1.getLong(r._1.size - 1)
 	    val fields = BasicUtils.getTrimmedFields(r._2.getString(0), fieldDelimIn)
 	    fields(timeStampFieldOrdinal) = alignedTime.toString
-	    //fields.mkString(fieldDelimOut)
 	    val keyRec = Record(r._1, 0, r._1.size - 1)
 	    (keyRec, fields)
 	  }).groupByKey.flatMap(r => {
@@ -117,7 +116,7 @@ object TemporalSelector extends JobConfiguration with GeneralUtility {
 	      } else {
 	        curTs =  v(timeStampFieldOrdinal).toLong
 	        if (curTs - lastTs > timeWindow) {
-	          var genTs = lastTs
+	          var genTs = lastTs + timeWindow
 	          while(genTs <= curTs) {
 	            v(timeStampFieldOrdinal) = genTs.toString
 	            newValues += v.mkString(fieldDelimOut)
