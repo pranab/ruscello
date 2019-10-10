@@ -25,6 +25,7 @@ import org.chombo.util.SeasonalAnalyzer
 import com.typesafe.config.Config
 import org.chombo.spark.common.Record
 import org.chombo.spark.common.GeneralUtility
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Selection within aligned time window
@@ -100,7 +101,35 @@ object TemporalSelector extends JobConfiguration with GeneralUtility {
 	    val alignedTime = r._1.getLong(r._1.size - 1)
 	    val fields = BasicUtils.getTrimmedFields(r._2.getString(0), fieldDelimIn)
 	    fields(timeStampFieldOrdinal) = alignedTime.toString
-	    fields.mkString(fieldDelimOut)
+	    //fields.mkString(fieldDelimOut)
+	    val keyRec = Record(r._1, 0, r._1.size - 1)
+	    (keyRec, fields)
+	  }).groupByKey.flatMap(r => {
+	    val values = r._2.toArray.sortBy(v => {v(timeStampFieldOrdinal).toLong})
+	    val newValues = ArrayBuffer[String]()
+	    var lastTs:Long = 0
+	    var curTs:Long = 0
+	    values.foreach(v => {
+	      //fill gaps in case of under sampling
+	      if (lastTs == 0) {
+	        lastTs = v(timeStampFieldOrdinal).toLong
+	        newValues += v.mkString(fieldDelimOut)
+	      } else {
+	        curTs =  v(timeStampFieldOrdinal).toLong
+	        if (curTs - lastTs > timeWindow) {
+	          var genTs = lastTs
+	          while(genTs <= curTs) {
+	            v(timeStampFieldOrdinal) = genTs.toString
+	            newValues += v.mkString(fieldDelimOut)
+	            genTs += timeWindow
+	          }
+	        } else {
+	          newValues += v.mkString(fieldDelimOut)
+	        }
+	      }
+	      lastTs = curTs
+	    })
+	    newValues
 	  })
 	  
 	  if (debugOn) {
