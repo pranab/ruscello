@@ -77,7 +77,7 @@ if __name__ == "__main__":
 			prStat[id] = (trend, weekSeas, dailySeas, sampler)
 		
 		numHours = 	24 * numDays 
-		(cTime, pTime) = pastTime(numDays)
+		(cTime, pTime) = pastTime(numDays, "d")
 		pTime = hourAlign(pTime)
 		sTime = pTime
 		sIntv = secInHour

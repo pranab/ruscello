@@ -52,7 +52,7 @@ object StlDecomposition extends JobConfiguration with GeneralUtility {
 	   val fieldDelimOut = getStringParamOrElse(appConfig, "field.delim.out", ",")
 	   val keyFieldOrdinals = toIntArray(getMandatoryIntListParam(appConfig, "id.field.ordinals"))
 	   val seqFieldOrd = getMandatoryIntParam(appConfig, "seq.field.ordinal","missing sequence field ordinal") 
-	   val quantFldOrd = getMandatoryIntParam(appConfig, "attr.ordinals")
+	   val quantFldOrd = getMandatoryIntParam(appConfig, "attr.ordinals", "missing quant field ordinal")
 	   val outerIterCount = getIntParamOrElse(appConfig, "iterCount.outer", 0)
 	   val innerIterCount = getIntParamOrElse(appConfig, "iterCount.inner", 1)
 	   val seasonalPeriod = getMandatoryIntParam(appConfig, "seasonal.period", "missing seasonal period")
