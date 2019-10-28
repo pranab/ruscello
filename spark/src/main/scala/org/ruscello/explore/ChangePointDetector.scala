@@ -55,8 +55,10 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility {
 	   val quantFldOrd = getMandatoryIntParam(appConfig, "attr.ordinals", "missing quant field ordinal")
 	   val numChangePoints =  getMandatoryIntParam(appConfig, "changePoint.num", "missing number of change points")
 	   val changePointStrategy = getStringParamOrElse(appConfig, "changePoint.strategy", "window")
-	   val windowLen = this.getConditionalMandatoryIntParam(changePointStrategy.equals("window"), appConfig, 
+	   val windowLen = getConditionalMandatoryIntParam(changePointStrategy.equals("window"), appConfig, 
 	       "changePoint.windowLen", "missng window length")
+	   val minSegmentLength = getConditionalMandatoryIntParam(changePointStrategy.equals("binarySearch"), appConfig, 
+	       "changePoint.minSegmentLength", "missng minimum segment length")
 	   val precision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   val debugOn = appConfig.getBoolean("debug.on")
 	   val saveOutput = appConfig.getBoolean("save.output")
@@ -75,7 +77,7 @@ object ChangePointDetector extends JobConfiguration with GeneralUtility {
 	     val detector = new ChangePointDetection(values)
 	     val changePoints = changePointStrategy match {
 	       case "window" => detector.detectByWindow(windowLen/2, numChangePoints)
-	       case "binarySearch" => detector.detectByBinarySearch(numChangePoints)
+	       case "binarySearch" => detector.detectByBinarySearch(numChangePoints, minSegmentLength)
 	     }
 	     
 	     changePoints.map(r => {
