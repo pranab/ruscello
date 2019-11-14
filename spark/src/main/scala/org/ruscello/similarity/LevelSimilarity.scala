@@ -27,8 +27,14 @@ import org.hoidla.window.SizeBoundWindow
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.SparkContext
-import org.apache.spark.streaming.kafka.KafkaUtils
-import kafka.serializer.StringDecoder
+//import org.apache.spark.streaming.kafka.KafkaUtils
+//import kafka.serializer.StringDecoder
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.kafka010._
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+
 
 case class WindowConfig(windowSize : Int, windowStep : Int, levelThrehold : Int, 
     levelThresholdMargin : Int, levelCrossingCountThreshold : Double, checkingStrategy : String, 
@@ -123,7 +129,7 @@ object LevelSimilarity {
 	    val lines = ssc.socketTextStream(host, port, StorageLevel.MEMORY_AND_DISK_SER_2)
 	    val stateStream = getStateStream(lines, idOrdinal, updateFunc)
 	    
-	    stateStream.foreach(ssrdd => {
+	    stateStream.foreachRDD(ssrdd => {
 	      ssrdd.foreach(ss => {
 	        val res = ss._2
 	        println("device:" + ss._1 + " num violations:" + res.numViolations)
@@ -132,6 +138,7 @@ object LevelSimilarity {
 	    
 	  }
 	  
+	  /*
 	  case "kafka" => {
 	    //kafka as stream source 
 	    val zooKeeperServerLList = config.getString("zookeeper.connect")
@@ -179,6 +186,7 @@ object LevelSimilarity {
 	      }
 	    }
 	  }
+	  */
 	  
 	  case _ => {
 	    throw new IllegalArgumentException("unsupported input stream source")
@@ -217,7 +225,7 @@ object LevelSimilarity {
   }
 	
   private def printInput(lines : DStream[String]) {
-    lines.foreach(lr => {
+    lines.foreachRDD(lr => {
 	      lr.foreach(l => {
 	        println(l)
 	      }
@@ -226,7 +234,7 @@ object LevelSimilarity {
   }
   
   private def printKeyedInput(keyedLines : DStream[(String, String)]) {
-    keyedLines.foreach(kls => {
+    keyedLines.foreachRDD(kls => {
 	      kls.foreach(kl => {
 	        println(kl._1)
 	      })

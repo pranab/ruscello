@@ -110,7 +110,7 @@ object EventCluster extends JobConfiguration {
 	   })
 	   
 	   if (false) {
-	     tsStrm.foreach(rdd => {
+	     tsStrm.foreachRDD(rdd => {
 	       val count = rdd.count
 	       println("*** num of records: " + count)
 	       rdd.foreach(r => {
@@ -125,7 +125,7 @@ object EventCluster extends JobConfiguration {
 	   
 	   if (false) {
 	     println("*** state stream")
-	     mappedStatefulStream.foreach(rdd => {
+	     mappedStatefulStream.foreachRDD(rdd => {
 	       rdd.foreach(r => {
 	         println("*** key: " + r._1 + " timestamp: " + r._2 + "alarm: " + r._3)
 	       })
@@ -139,7 +139,7 @@ object EventCluster extends JobConfiguration {
 
 	   if (false) {
 	     println("*** alarms" )
-	     alarmStream.foreach(rdd => {
+	     alarmStream.foreachRDD(rdd => {
 	       rdd.foreach(r => {
 	         println(r)
 	       })
@@ -155,7 +155,7 @@ object EventCluster extends JobConfiguration {
 	   
 	   // Wait and then exit. To run forever call without a timeout
 	   if (duration > 0) {
-		   strContxt.awaitTermination(duration * 1000)
+		   strContxt.awaitTermination()
 	   } else  {
 		   strContxt.awaitTermination()
 	   }
