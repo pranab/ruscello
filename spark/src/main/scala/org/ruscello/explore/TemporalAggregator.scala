@@ -186,16 +186,16 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	      val value = r._2
 	      val newKey = Record(key, 0, key.size - 1)
 	      val newValue = if (aggrType.equals("minMax") || aggrType.equals("stdDev")) {
-		    val newValue = Record(3)
-		    newValue.addInt(key.getInt(key.size - 1))
-		    newValue.addDouble(value.getDouble(0))
-		    newValue.addDouble(value.getDouble(1))
+		      val newValue = Record(3)
+		      newValue.addInt(key.getInt(key.size - 1))
+		      newValue.addDouble(value.getDouble(0))
+		      newValue.addDouble(value.getDouble(1))
 	        newValue
 	      } else {
-		    val newValue = Record(2)
-		    newValue.addInt(key.getInt(key.size - 1))
-		    newValue.addDouble(value.getDouble(0))
-		    newValue
+		      val newValue = Record(2)
+		      newValue.addInt(key.getInt(key.size - 1))
+		      newValue.addDouble(value.getDouble(0))
+		      newValue
 	      }
 	      (newKey, newValue)
 	    }).groupByKey.map(r => {
