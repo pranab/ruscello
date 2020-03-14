@@ -63,11 +63,13 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	   } else {
 	     BasicUtils.toEpochTime(aggrWindowTimeUnit) * aggrWindowTimeLength / 1000
 	   }
-	   val aggrType = getStringParamOrElse(appConfig, "aggr.type", "average") 
 	   val aggrTypes = getMandatoryIntStringMapParam(appConfig, "aggr.types", "missing aggregation type")
+	   val validAggregations = Array("count", "sum", "average", "stdDev", "minMax", "uniqueCount")
+	   attrOrdinals.foreach(fld => {
+	     val aggrType = aggrTypes.get(fld)
+	     assertStringMember(aggrType, validAggregations, "invalid aggregation type " + aggrType)
+	   }) 
 	   
-	   val validAggregations = Array("count", "sum", "average", "stdDev", "minMax")
-	   assertStringMember(aggrType, validAggregations, "invalid aggregation type " + aggrType)
 	   val outputCompact = getBooleanParamOrElse(appConfig, "output.compact", true)
 	   val outputPrecision = getIntParamOrElse(appConfig, "output.precision", 3)
 	   
@@ -93,19 +95,30 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 			   key.addInt(fld)
 			   
 			   val fieldVal = fields(fld).toDouble
+			   val aggrType = aggrTypes.get(fld)
 			   val count = 1
-			   val value =  if (aggrType.equals("minMax")) {
-			     val value = Record(2)
-			     value.add(fieldVal, fieldVal)
-			     value
-			   } else  if (aggrType.equals("stdDev")) {
-			     val value = Record(3)
-			     value.add(count, fieldVal, fieldVal * fieldVal)
-			     value
-			   } else {
-			     val value = Record(2)
-			     value.add(count, fieldVal)
-			     value
+			   
+			   val value =  aggrType  match {
+			     case "minMax" => {
+			       val value = Record(2)
+			       value.add(fieldVal, fieldVal)
+			       value
+			     } 
+			     case "stdDev" => {
+			       val value = Record(3)
+			       value.add(count, fieldVal, fieldVal * fieldVal)
+			       value
+			     } 
+			     case "uniqueCount" => {
+			       val value = Record(fields(fld))
+			       value
+			     }			
+
+			     case _ => {
+			       val value = Record(2)
+			       value.add(count, fieldVal)
+			       value
+			     }
 			   }
 			   (key, value)
 		   })
@@ -129,7 +142,6 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	          newVal
 	        })
 	      }
-	      
 	      case "stdDev" => {
 	        values.reduce((v1, v2) => {
 	          val count = v1.getInt(0) + v2.getInt(0)
@@ -140,7 +152,13 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	          newVal
 	        })
 	      }
-	      
+			  case "uniqueCount" => {
+			    val uniqValues  = scala.collection.mutable.Set[String]()
+			    values.foreach(v => uniqValues += v.getString(0))
+			    val newVal = Record(uniqValues.size)
+			    uniqValues.foreach(v => newVal.addString(v))
+	        newVal
+			  } 
 	      case _ => {
 	        values.reduce((v1, v2) => {
 	          val count = v1.getInt(0) + v2.getInt(0)
@@ -191,14 +209,12 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	      case "minMax" => {
 	        Record(va)
 	      }
-	      
+			  case "uniqueCount" => {
+			    createIntFieldRec(va.size)
+			  }	      
 	    }
 	    (key, value)
 	  })
-	  
-	  
-	  
-	    
 	    
 	  //formatting
 	  val outData = 
@@ -207,6 +223,9 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	    aggrData.map(r => {
 	      val key = r._1
 	      val value = r._2
+	      val fldOrd = key.getInt(key.size - 1)
+	      val aggrType = aggrTypes.get(fldOrd)
+
 	      val newKey = Record(key, 0, key.size - 1)
 	      val newValue = if (aggrType.equals("minMax") || aggrType.equals("stdDev")) {
 		      val newValue = Record(3)
@@ -217,16 +236,26 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	      } else {
 		      val newValue = Record(2)
 		      newValue.addInt(key.getInt(key.size - 1))
-		      newValue.addDouble(value.getDouble(0))
+		      if (aggrType.equals("uniqueCount")) {
+		        newValue.addInt(value.getInt(0))
+		      } else {
+		        newValue.addDouble(value.getDouble(0))
+		      }
 		      newValue
 	      }
 	      (newKey, newValue)
 	    }).groupByKey.map(r => {
 	      val key = r._1
 	      val values = r._2.toList
+	      val fldOrd = key.getInt(key.size - 1)
+	      val aggrType = aggrTypes.get(fldOrd)
 	      values.sortBy(v => v.getInt(0))
 	      val aggrValues = values.map(v => {
-	        val str = BasicUtils.formatDouble(v.getDouble(1), outputPrecision)
+	        val str = if (aggrType.equals("uniqueCount")) {
+	          v.getInt(1).toString()
+	        } else {
+	          BasicUtils.formatDouble(v.getDouble(1), outputPrecision)
+	        }
 	        if (aggrType.equals("minMax") || aggrType.equals("stdDev")) {
 	          str + fieldDelimOut + BasicUtils.formatDouble(v.getDouble(2), outputPrecision)
 	        } else {
