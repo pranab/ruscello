@@ -64,6 +64,8 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	     BasicUtils.toEpochTime(aggrWindowTimeUnit) * aggrWindowTimeLength / 1000
 	   }
 	   val aggrType = getStringParamOrElse(appConfig, "aggr.type", "average") 
+	   val aggrTypes = getMandatoryIntStringMapParam(appConfig, "aggr.types", "missing aggregation type")
+	   
 	   val validAggregations = Array("count", "sum", "average", "stdDev", "minMax")
 	   assertStringMember(aggrType, validAggregations, "invalid aggregation type " + aggrType)
 	   val outputCompact = getBooleanParamOrElse(appConfig, "output.compact", true)
@@ -112,69 +114,90 @@ object TemporalAggregator extends JobConfiguration with GeneralUtility {
 	  })
 	  
 	  //reduce
-	  val redData = if (aggrType.equals("minMax")) {
-	    keyedData.reduceByKey((v1,v2) => {
-	      val min = if (v1.getDouble(0) < v2.getDouble(0)) v1.getDouble(0) else v2.getDouble(0)
-	      val max = if (v1.getDouble(1) > v2.getDouble(1)) v1.getDouble(1) else v2.getDouble(1)
-	      val newVal = Record(2)
-	      newVal.add(min, max)
-	      newVal
-	    })
-	  } else if (aggrType.equals("stdDev")){
-	    keyedData.reduceByKey((v1,v2) => {
-	      val count = v1.getInt(0) + v2.getInt(0)
-	      val sum = v1.getDouble(1) + v2.getDouble(1)
-	      val sumSq	 = v1.getDouble(2) + v2.getDouble(2)
-	      val newVal = Record(3)
-	      newVal.add(count, sum, sumSq)
-	      newVal
-	    })
-	  } else {
-	    keyedData.reduceByKey((v1,v2) => {
-	      val count = v1.getInt(0) + v2.getInt(0)
-	      val sum = v1.getDouble(1) + v2.getDouble(1)
-	      val newVal = Record(2)
-	      newVal.add(count, sum)
-	      newVal
-	    })
-	  }
+	  val redData = keyedData.groupByKey().map(r => {
+	    val key = r._1
+	    val values = r._2
+	    val fldOrd = key.getInt(key.size - 1)
+	    val aggrType = aggrTypes.get(fldOrd)
+	    val reduced = aggrType match {
+	      case "minMax" => {
+	        values.reduce((v1, v2) => {
+	          val min = if (v1.getDouble(0) < v2.getDouble(0)) v1.getDouble(0) else v2.getDouble(0)
+	          val max = if (v1.getDouble(1) > v2.getDouble(1)) v1.getDouble(1) else v2.getDouble(1)
+	          val newVal = Record(2)
+	          newVal.add(min, max)
+	          newVal
+	        })
+	      }
+	      
+	      case "stdDev" => {
+	        values.reduce((v1, v2) => {
+	          val count = v1.getInt(0) + v2.getInt(0)
+	          val sum = v1.getDouble(1) + v2.getDouble(1)
+	          val sumSq	 = v1.getDouble(2) + v2.getDouble(2)
+	          val newVal = Record(3)
+	          newVal.add(count, sum, sumSq)
+	          newVal
+	        })
+	      }
+	      
+	      case _ => {
+	        values.reduce((v1, v2) => {
+	          val count = v1.getInt(0) + v2.getInt(0)
+	          val sum = v1.getDouble(1) + v2.getDouble(1)
+	          val newVal = Record(2)
+	          newVal.add(count, sum)
+	          newVal
+	        })	        
+	      }
+	      
+	    }
+	    (key, reduced)
+	  })
 	  
-	  //aggregate
-	  val aggrData = redData.mapValues(v => {
-	    val value =  aggrType match {
+	  val aggrData = redData.map(r => {
+	    val key = r._1
+	    val va = r._2
+	    val fldOrd = key.getInt(key.size - 1)
+	    val aggrType = aggrTypes.get(fldOrd)
+	    
+	    val value = aggrType match { 
 	      case "count" => {
 	        val value = Record(1)
-	        value.addInt(v.getInt(0))
+	        value.addInt(va.getInt(0))
 	        value
 	      }
 	      case "sum" =>  {
 	        val value = Record(1)
-	        value.addDouble(v.getDouble(1))
+	        value.addDouble(va.getDouble(1))
 	        value
 	      }
 	      case "average" => {
 	        val value = Record(1)
-	        value.addDouble(v.getDouble(1) /  v.getInt(0))
+	        value.addDouble(va.getDouble(1) /  va.getInt(0))
 	        value
 	      }
 	      case "stdDev" => {
 	        val value = Record(2)
-	        val count = v.getInt(0)
-	        val sum = v.getDouble(1)
-	        val sumSq= v.getDouble(2)
+	        val count = va.getInt(0)
+	        val sum = va.getDouble(1)
+	        val sumSq= va.getDouble(2)
 	        val av = sum / count
-	        val va = ((sumSq / count - av * av) * (count - 1)) / count
-	        val sd = Math.sqrt(va)
+	        val vari = ((sumSq / count - av * av) * (count - 1)) / count
+	        val sd = Math.sqrt(vari)
 	        value.add(av, sd)
 	        value
 	      }
 	      case "minMax" => {
-	        val value = Record(v)
-	        value
+	        Record(va)
 	      }
+	      
 	    }
-	    value
+	    (key, value)
 	  })
+	  
+	  
+	  
 	    
 	    
 	  //formatting
