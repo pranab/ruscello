@@ -29,6 +29,11 @@ import org.chombo.math.MathUtils
 import org.hoidla.window.WindowUtils
 
 
+/**
+* extracts features from spikey data i.e gap, spike value, spike width
+* @param args
+* @return
+*/
 object SpikeFeatureExtractor extends JobConfiguration with GeneralUtility {
   
    /**
@@ -70,11 +75,14 @@ object SpikeFeatureExtractor extends JobConfiguration with GeneralUtility {
   	     val line = values(0).getString(1)
   	     val items = BasicUtils.getTrimmedFields(line, fieldDelimIn)
  	       var prQuant = items(a).toDouble
-	       var prPeakSeq = items(seqFieldOrd).toLong 	
- 	       //val prSeq = items(seqFieldOrd).toLong 	
+ 	       val seq = items(seqFieldOrd).toLong 	
+	       var prPeakSeq = seq	
+	       var prSeq = seq
  	       var inSpike = false
 	       var peakValue = 0.0
 	       var peakSeq:Long = 0
+	       var spikeBegSeq:Long = 0
+	       
 	       val spikeValues = ArrayBuffer[(Record, Record)]()
 	       
   	     for (i <- 1 to size-1) {
@@ -89,6 +97,7 @@ object SpikeFeatureExtractor extends JobConfiguration with GeneralUtility {
  	             //enter spike
  	             peakValue = quant
  	             peakSeq = seq
+ 	             spikeBegSeq = prSeq
  	             inSpike = true
  	           } else if (quant > peakValue) {
  	             peakValue = quant
@@ -96,20 +105,24 @@ object SpikeFeatureExtractor extends JobConfiguration with GeneralUtility {
  	           }
  	         } else {
  	           if (inSpike) {
- 	             //enter base line
+ 	             //create spike data
  	             val spKey = Record(key)
- 	             val spVal = Record(3)
+ 	             val spVal = Record(4)
  	             spVal.addInt(a)
- 	             spVal.addLong(peakSeq - prPeakSeq)
+ 	             spVal.addLong(peakSeq)
+ 	             spVal.addInt((peakSeq - prPeakSeq).toInt)
+ 	             spVal.addInt((prSeq - spikeBegSeq).toInt)
  	             spVal.addDouble(peakValue)
  	             val sp = (spKey, spVal)
  	             spikeValues += sp
+ 	             
+ 	             //enter base line
  	             inSpike = false
  	             prPeakSeq = peakSeq
  	           } 	           
  	         }
-  	       prQuant = quant
-  	       
+  	       prQuant = quant 	  
+  	       prSeq = seq
   	     }
   	     
   	     spikeValues
